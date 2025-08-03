@@ -225,39 +225,27 @@
                 freqLfo.connect(freqLfoGain);
                 freqLfoGain.connect(mainOsc.frequency);
                 
-                // Secondary harmonics for richer sound
-                const harmonic = this.audioContext.createOscillator();
-                const harmonicGain = this.audioContext.createGain();
-                
-                harmonic.type = 'triangle';
-                harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
-                harmonicGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+
                 
                 // Connect everything
                 mainOsc.connect(mainGain);
-                harmonic.connect(harmonicGain);
-                
                 mainGain.connect(this.masterGain);
-                harmonicGain.connect(this.masterGain);
                 
-                // Set base volume
-                const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
+                // Set base volume that changes with velocity
+                const baseVolume = Math.min(0.6, Math.abs(velocity) / 400); // Higher max, responds more to velocity
                 mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
                 
                 // Start oscillators
                 const now = this.audioContext.currentTime;
                 mainOsc.start(now);
-                harmonic.start(now);
                 freqLfo.start(now);
                 volumeLfo.start(now);
                 
                 oscillatorGroup.push({
                     main: mainOsc,
-                    harmonic: harmonic,
                     freqLfo: freqLfo,
                     volumeLfo: volumeLfo,
                     mainGain: mainGain,
-                    harmonicGain: harmonicGain,
                     freqLfoGain: freqLfoGain,
                     volumeLfoGain: volumeLfoGain
                 });
@@ -268,19 +256,18 @@
             updateSound(soundGroup, velocity) {
                 if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
                 
-                const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
-                const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
+                const baseVolume = Math.min(0.6, Math.abs(velocity) / 400); // Volume decreases as velocity decreases
                 const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8; // Longer waves overall
                 const now = this.audioContext.currentTime;
                 
                 // Update frequencies and volume smoothly
                 soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
-                soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
                 soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
                 
                 // Update volume oscillation frequency (faster spinning = shorter sine waves)
                 soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
                 
+                // Update base volume based on velocity
                 soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
                 soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.2, now + 0.1);
             }
@@ -293,13 +280,11 @@
                 
                 // Immediate fade out
                 soundGroup.mainGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-                soundGroup.harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
                 
                 // Stop oscillators after fade
                 setTimeout(() => {
                     try {
                         soundGroup.main.stop();
-                        soundGroup.harmonic.stop();
                         soundGroup.freqLfo.stop();
                         soundGroup.volumeLfo.stop();
                     } catch (e) {
