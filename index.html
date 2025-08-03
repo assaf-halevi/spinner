@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Spinner</title>
+    <title>Momentum Spinner</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff69b4">
     <style>
@@ -47,13 +47,17 @@
         .star {
             width: 200px;
             height: 200px;
-            transition: transform 0.1s ease-out;
+            transition: none;
             cursor: grab;
             filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
         }
 
         .star:active {
             cursor: grabbing;
+        }
+
+        .star.spinning {
+            cursor: default;
         }
 
         .instructions {
@@ -69,7 +73,7 @@
 
         .rotation-display {
             position: absolute;
-            bottom: 100px;
+            bottom: 150px;
             left: 50%;
             transform: translateX(-50%);
             color: white;
@@ -79,6 +83,20 @@
             background: rgba(255, 255, 255, 0.1);
             padding: 10px 20px;
             border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .velocity-display {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 18px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 15px;
             backdrop-filter: blur(10px);
         }
 
@@ -112,14 +130,32 @@
             display: none;
             clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
         }
+
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 10px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .spinning {
+            color: #00ff00 !important;
+        }
     </style>
 </head>
 <body>
     <div class="game-container">
         <div class="instructions">
-            Swipe to rotate the spinner!<br>
-            <small>Replace "star.png" with your own spinner image</small>
+            Swipe fast to spin with momentum!<br>
+            <small>Touch to stop • Faster swipe = longer spin</small>
         </div>
+        
+        <div class="status-indicator" id="statusIndicator">Ready</div>
         
         <div class="star-container">
             <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
@@ -130,23 +166,43 @@
             Rotation: 0°
         </div>
         
-        <button class="reset-btn" id="resetBtn">Reset Rotation</button>
+        <div class="velocity-display" id="velocityDisplay">
+            Velocity: 0°/s
+        </div>
+        
+        <button class="reset-btn" id="resetBtn">Reset</button>
     </div>
 
     <script>
-        class SwipeRotateGame {
+        class MomentumSpinner {
             constructor() {
                 this.star = document.getElementById('rotatingImage');
                 this.fallbackStar = document.getElementById('fallbackStar');
                 this.rotationDisplay = document.getElementById('rotationDisplay');
+                this.velocityDisplay = document.getElementById('velocityDisplay');
+                this.statusIndicator = document.getElementById('statusIndicator');
                 this.resetBtn = document.getElementById('resetBtn');
                 
                 this.rotation = 0;
-                this.isRotating = false;
+                this.velocity = 0; // degrees per second
+                this.isInteracting = false;
+                this.isSpinning = false;
+                
+                // Touch/mouse tracking
                 this.startX = 0;
                 this.startY = 0;
                 this.centerX = 0;
                 this.centerY = 0;
+                this.lastAngle = 0;
+                this.lastTime = 0;
+                this.velocityHistory = [];
+                
+                // Physics constants
+                this.friction = 0.98; // Velocity decay per frame
+                this.minVelocity = 1; // Stop spinning below this velocity
+                this.velocityMultiplier = 3; // Amplify swipe velocity
+                
+                this.animationId = null;
                 
                 this.init();
             }
@@ -171,17 +227,24 @@
                 this.star.addEventListener('mouseleave', this.handleEnd.bind(this));
                 
                 // Reset button
-                this.resetBtn.addEventListener('click', this.resetRotation.bind(this));
+                this.resetBtn.addEventListener('click', this.resetSpinner.bind(this));
                 
                 // Prevent context menu on long press
                 this.star.addEventListener('contextmenu', (e) => e.preventDefault());
                 
+                // Start animation loop
+                this.animate();
                 this.updateDisplay();
             }
             
             handleStart(e) {
                 e.preventDefault();
-                this.isRotating = true;
+                
+                // Stop any current spinning
+                this.stopSpinning();
+                
+                this.isInteracting = true;
+                this.velocityHistory = [];
                 
                 const rect = this.star.getBoundingClientRect();
                 this.centerX = rect.left + rect.width / 2;
@@ -192,10 +255,18 @@
                 
                 this.startX = clientX;
                 this.startY = clientY;
+                
+                // Calculate initial angle
+                const deltaX = clientX - this.centerX;
+                const deltaY = clientY - this.centerY;
+                this.lastAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+                this.lastTime = Date.now();
+                
+                this.updateStatus('Dragging');
             }
             
             handleMove(e) {
-                if (!this.isRotating) return;
+                if (!this.isInteracting) return;
                 e.preventDefault();
                 
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -206,30 +277,91 @@
                 const deltaY = clientY - this.centerY;
                 const currentAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
                 
-                // Calculate the angle from center to start position
-                const startDeltaX = this.startX - this.centerX;
-                const startDeltaY = this.startY - this.centerY;
-                const startAngle = Math.atan2(startDeltaY, startDeltaX) * (180 / Math.PI);
-                
                 // Calculate rotation difference
-                let angleDiff = currentAngle - startAngle;
+                let angleDiff = currentAngle - this.lastAngle;
                 
-                // Normalize angle difference to prevent jumps
+                // Handle angle wrap-around
                 if (angleDiff > 180) angleDiff -= 360;
                 if (angleDiff < -180) angleDiff += 360;
                 
-                this.rotation += angleDiff * 0.5; // Reduce sensitivity
+                // Update rotation
+                this.rotation += angleDiff;
                 
-                // Update start position for next calculation
-                this.startX = clientX;
-                this.startY = clientY;
+                // Calculate velocity for momentum
+                const currentTime = Date.now();
+                const timeDiff = currentTime - this.lastTime;
+                
+                if (timeDiff > 0) {
+                    const instantVelocity = (angleDiff / timeDiff) * 1000; // degrees per second
+                    this.velocityHistory.push(instantVelocity);
+                    
+                    // Keep only recent velocity samples
+                    if (this.velocityHistory.length > 5) {
+                        this.velocityHistory.shift();
+                    }
+                }
+                
+                this.lastAngle = currentAngle;
+                this.lastTime = currentTime;
                 
                 this.updateRotation();
                 this.updateDisplay();
             }
             
             handleEnd(e) {
-                this.isRotating = false;
+                if (!this.isInteracting) return;
+                
+                this.isInteracting = false;
+                
+                // Calculate average velocity from recent samples
+                if (this.velocityHistory.length > 0) {
+                    const avgVelocity = this.velocityHistory.reduce((a, b) => a + b, 0) / this.velocityHistory.length;
+                    this.velocity = avgVelocity * this.velocityMultiplier;
+                    
+                    // Start spinning if velocity is significant
+                    if (Math.abs(this.velocity) > this.minVelocity) {
+                        this.startSpinning();
+                    } else {
+                        this.updateStatus('Ready');
+                    }
+                } else {
+                    this.updateStatus('Ready');
+                }
+                
+                this.velocityHistory = [];
+            }
+            
+            startSpinning() {
+                this.isSpinning = true;
+                this.star.classList.add('spinning');
+                this.updateStatus('Spinning');
+            }
+            
+            stopSpinning() {
+                this.isSpinning = false;
+                this.velocity = 0;
+                this.star.classList.remove('spinning');
+                this.updateStatus('Ready');
+            }
+            
+            animate() {
+                // Physics simulation
+                if (this.isSpinning && !this.isInteracting) {
+                    // Apply friction
+                    this.velocity *= this.friction;
+                    
+                    // Stop spinning if velocity is too low
+                    if (Math.abs(this.velocity) < this.minVelocity) {
+                        this.stopSpinning();
+                    } else {
+                        // Update rotation based on velocity
+                        this.rotation += this.velocity / 60; // Assuming 60fps
+                        this.updateRotation();
+                    }
+                }
+                
+                this.updateDisplay();
+                this.animationId = requestAnimationFrame(() => this.animate());
             }
             
             updateRotation() {
@@ -239,10 +371,18 @@
             updateDisplay() {
                 const normalizedRotation = ((this.rotation % 360) + 360) % 360;
                 this.rotationDisplay.textContent = `Rotation: ${Math.round(normalizedRotation)}°`;
+                this.velocityDisplay.textContent = `Velocity: ${Math.round(Math.abs(this.velocity))}°/s`;
             }
             
-            resetRotation() {
+            updateStatus(status) {
+                this.statusIndicator.textContent = status;
+                this.statusIndicator.classList.toggle('spinning', status === 'Spinning');
+            }
+            
+            resetSpinner() {
+                this.stopSpinning();
                 this.rotation = 0;
+                this.velocity = 0;
                 this.updateRotation();
                 this.updateDisplay();
             }
@@ -250,7 +390,7 @@
         
         // Start the game when page loads
         window.addEventListener('load', () => {
-            new SwipeRotateGame();
+            new MomentumSpinner();
         });
         
         // Prevent scrolling and zooming on mobile
