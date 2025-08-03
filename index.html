@@ -233,22 +233,12 @@
                 harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
                 harmonicGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
                 
-                // High frequency sparkle (reduced volume)
-                const sparkle = this.audioContext.createOscillator();
-                const sparkleGain = this.audioContext.createGain();
-                
-                sparkle.type = 'square';
-                sparkle.frequency.setValueAtTime(baseFreq * 3, this.audioContext.currentTime);
-                sparkleGain.gain.setValueAtTime(0.02, this.audioContext.currentTime); // Much lower volume
-                
                 // Connect everything
                 mainOsc.connect(mainGain);
                 harmonic.connect(harmonicGain);
-                sparkle.connect(sparkleGain);
                 
                 mainGain.connect(this.masterGain);
                 harmonicGain.connect(this.masterGain);
-                sparkleGain.connect(this.masterGain);
                 
                 // Set base volume
                 const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
@@ -258,19 +248,16 @@
                 const now = this.audioContext.currentTime;
                 mainOsc.start(now);
                 harmonic.start(now);
-                sparkle.start(now);
                 freqLfo.start(now);
                 volumeLfo.start(now);
                 
                 oscillatorGroup.push({
                     main: mainOsc,
                     harmonic: harmonic,
-                    sparkle: sparkle,
                     freqLfo: freqLfo,
                     volumeLfo: volumeLfo,
                     mainGain: mainGain,
                     harmonicGain: harmonicGain,
-                    sparkleGain: sparkleGain,
                     freqLfoGain: freqLfoGain,
                     volumeLfoGain: volumeLfoGain
                 });
@@ -289,7 +276,6 @@
                 // Update frequencies and volume smoothly
                 soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
                 soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
-                soundGroup.sparkle.frequency.exponentialRampToValueAtTime(baseFreq * 3, now + 0.1);
                 soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
                 
                 // Update volume oscillation frequency (faster spinning = shorter sine waves)
@@ -303,25 +289,23 @@
                 if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
                 
                 const now = this.audioContext.currentTime;
-                const fadeTime = 0.3;
+                const fadeTime = 0.1; // Much faster fade for immediate stop
                 
-                // Fade out
+                // Immediate fade out
                 soundGroup.mainGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
                 soundGroup.harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-                soundGroup.sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
                 
                 // Stop oscillators after fade
                 setTimeout(() => {
                     try {
                         soundGroup.main.stop();
                         soundGroup.harmonic.stop();
-                        soundGroup.sparkle.stop();
                         soundGroup.freqLfo.stop();
                         soundGroup.volumeLfo.stop();
                     } catch (e) {
                         // Oscillators might already be stopped
                     }
-                }, fadeTime * 1000 + 100);
+                }, fadeTime * 1000 + 50); // Shorter timeout
             }
             
             toggle() {
