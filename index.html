@@ -14,7 +14,7 @@
         }
 
         body {
-            background: #0000FF;
+            background: #000000;
             font-family: Arial, sans-serif;
             overflow: hidden;
             height: 100vh;
@@ -145,10 +145,44 @@
         .spinning {
             color: #00ff00 !important;
         }
+
+        .sound-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sound-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .sound-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .sound-toggle.active {
+            background: rgba(0, 255, 0, 0.3);
+            border-color: #00ff00;
+        }
     </style>
 </head>
 <body>
     <div class="game-container">
+        <div class="sound-controls">
+            <button class="sound-toggle" id="soundToggle">🔊 Sound ON</button>
+        </div>
+        
         <div class="star-container">
             <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
             <div class="css-star" id="fallbackStar"></div>
@@ -156,10 +190,166 @@
     </div>
 
     <script>
+        class AudioEngine {
+            constructor() {
+                this.audioContext = null;
+                this.masterGain = null;
+                this.oscillators = [];
+                this.isEnabled = true;
+                this.isInitialized = false;
+            }
+            
+            async init() {
+                if (this.isInitialized) return;
+                
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.masterGain = this.audioContext.createGain();
+                    this.masterGain.connect(this.audioContext.destination);
+                    this.masterGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    this.isInitialized = true;
+                } catch (error) {
+                    console.warn('Audio not supported:', error);
+                    this.isEnabled = false;
+                }
+            }
+            
+            createBubblingSound(velocity) {
+                if (!this.isEnabled || !this.isInitialized) return null;
+                
+                // Resume audio context if suspended (browser policy)
+                if (this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                
+                // Create multiple oscillators for complex bubbling sound
+                const oscillatorGroup = [];
+                const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
+                
+                // Main bubble tone
+                const mainOsc = this.audioContext.createOscillator();
+                const mainGain = this.audioContext.createGain();
+                
+                mainOsc.type = 'sine';
+                mainOsc.frequency.setValueAtTime(baseFreq, this.audioContext.currentTime);
+                
+                // Modulate frequency for bubbling effect
+                const lfo = this.audioContext.createOscillator();
+                const lfoGain = this.audioContext.createGain();
+                lfo.type = 'sine';
+                lfo.frequency.setValueAtTime(Math.abs(velocity) * 0.1 + 5, this.audioContext.currentTime);
+                lfoGain.gain.setValueAtTime(baseFreq * 0.2, this.audioContext.currentTime);
+                
+                lfo.connect(lfoGain);
+                lfoGain.connect(mainOsc.frequency);
+                
+                // Secondary harmonics for richer sound
+                const harmonic = this.audioContext.createOscillator();
+                const harmonicGain = this.audioContext.createGain();
+                
+                harmonic.type = 'triangle';
+                harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
+                harmonicGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                
+                // High frequency sparkle
+                const sparkle = this.audioContext.createOscillator();
+                const sparkleGain = this.audioContext.createGain();
+                
+                sparkle.type = 'square';
+                sparkle.frequency.setValueAtTime(baseFreq * 3, this.audioContext.currentTime);
+                sparkleGain.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+                
+                // Connect everything
+                mainOsc.connect(mainGain);
+                harmonic.connect(harmonicGain);
+                sparkle.connect(sparkleGain);
+                
+                mainGain.connect(this.masterGain);
+                harmonicGain.connect(this.masterGain);
+                sparkleGain.connect(this.masterGain);
+                
+                // Set initial volume based on velocity
+                const volume = Math.min(0.8, Math.abs(velocity) / 500);
+                mainGain.gain.setValueAtTime(volume, this.audioContext.currentTime);
+                
+                // Start oscillators
+                const now = this.audioContext.currentTime;
+                mainOsc.start(now);
+                harmonic.start(now);
+                sparkle.start(now);
+                lfo.start(now);
+                
+                oscillatorGroup.push({
+                    main: mainOsc,
+                    harmonic: harmonic,
+                    sparkle: sparkle,
+                    lfo: lfo,
+                    mainGain: mainGain,
+                    harmonicGain: harmonicGain,
+                    sparkleGain: sparkleGain,
+                    lfoGain: lfoGain
+                });
+                
+                return oscillatorGroup[0];
+            }
+            
+            updateSound(soundGroup, velocity) {
+                if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
+                
+                const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
+                const volume = Math.min(0.8, Math.abs(velocity) / 500);
+                const now = this.audioContext.currentTime;
+                
+                // Update frequencies and volume smoothly
+                soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
+                soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
+                soundGroup.sparkle.frequency.exponentialRampToValueAtTime(baseFreq * 3, now + 0.1);
+                soundGroup.lfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
+                
+                soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, volume), now + 0.1);
+                soundGroup.lfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.2, now + 0.1);
+            }
+            
+            stopSound(soundGroup) {
+                if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
+                
+                const now = this.audioContext.currentTime;
+                const fadeTime = 0.3;
+                
+                // Fade out
+                soundGroup.mainGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
+                soundGroup.harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
+                soundGroup.sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
+                
+                // Stop oscillators after fade
+                setTimeout(() => {
+                    try {
+                        soundGroup.main.stop();
+                        soundGroup.harmonic.stop();
+                        soundGroup.sparkle.stop();
+                        soundGroup.lfo.stop();
+                    } catch (e) {
+                        // Oscillators might already be stopped
+                    }
+                }, fadeTime * 1000 + 100);
+            }
+            
+            toggle() {
+                this.isEnabled = !this.isEnabled;
+                if (!this.isEnabled && this.masterGain) {
+                    this.masterGain.gain.setValueAtTime(0, this.audioContext.currentTime);
+                } else if (this.isEnabled && this.masterGain) {
+                    this.masterGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                }
+                return this.isEnabled;
+            }
+        }
+
         class MomentumSpinner {
             constructor() {
                 this.star = document.getElementById('rotatingImage');
                 this.fallbackStar = document.getElementById('fallbackStar');
+                this.soundToggle = document.getElementById('soundToggle');
                 
                 this.rotation = 0;
                 this.velocity = 0; // degrees per second
@@ -182,15 +372,34 @@
                 
                 this.animationId = null;
                 
+                // Audio
+                this.audioEngine = new AudioEngine();
+                this.currentSound = null;
+                
                 this.init();
             }
             
-            init() {
+            async init() {
+                // Initialize audio
+                await this.audioEngine.init();
+                
                 // Handle image load error - show CSS star as fallback
                 this.star.addEventListener('error', () => {
                     this.star.style.display = 'none';
                     this.fallbackStar.style.display = 'block';
                     this.star = this.fallbackStar;
+                });
+                
+                // Sound toggle
+                this.soundToggle.addEventListener('click', () => {
+                    const isEnabled = this.audioEngine.toggle();
+                    this.soundToggle.textContent = isEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+                    this.soundToggle.classList.toggle('active', isEnabled);
+                    
+                    if (!isEnabled && this.currentSound) {
+                        this.audioEngine.stopSound(this.currentSound);
+                        this.currentSound = null;
+                    }
                 });
                 
                 // Touch events for mobile
@@ -213,6 +422,11 @@
             
             handleStart(e) {
                 e.preventDefault();
+                
+                // Initialize audio context on first user interaction
+                if (!this.audioEngine.isInitialized) {
+                    this.audioEngine.init();
+                }
                 
                 // Stop any current spinning
                 this.stopSpinning();
@@ -303,12 +517,23 @@
             startSpinning() {
                 this.isSpinning = true;
                 this.star.classList.add('spinning');
+                
+                // Start bubbling sound
+                if (this.audioEngine.isEnabled) {
+                    this.currentSound = this.audioEngine.createBubblingSound(this.velocity);
+                }
             }
             
             stopSpinning() {
                 this.isSpinning = false;
                 this.velocity = 0;
                 this.star.classList.remove('spinning');
+                
+                // Stop sound
+                if (this.currentSound) {
+                    this.audioEngine.stopSound(this.currentSound);
+                    this.currentSound = null;
+                }
             }
             
             animate() {
@@ -316,6 +541,11 @@
                 if (this.isSpinning && !this.isInteracting) {
                     // Apply friction
                     this.velocity *= this.friction;
+                    
+                    // Update sound based on current velocity
+                    if (this.currentSound && this.audioEngine.isEnabled) {
+                        this.audioEngine.updateSound(this.currentSound, this.velocity);
+                    }
                     
                     // Stop spinning if velocity is too low
                     if (Math.abs(this.velocity) < this.minVelocity) {
@@ -355,6 +585,3 @@
     </script>
 </body>
 </html>
-
-
-
