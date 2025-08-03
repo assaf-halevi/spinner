@@ -146,43 +146,11 @@
             color: #00ff00 !important;
         }
 
-        .sound-controls {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
 
-        .sound-toggle {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 2px solid white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-        }
-
-        .sound-toggle:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .sound-toggle.active {
-            background: rgba(0, 255, 0, 0.3);
-            border-color: #00ff00;
-        }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <div class="sound-controls">
-            <button class="sound-toggle" id="soundToggle">🔊 Sound ON</button>
-        </div>
-        
         <div class="star-container">
             <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
             <div class="css-star" id="fallbackStar"></div>
@@ -233,15 +201,29 @@
                 mainOsc.type = 'sine';
                 mainOsc.frequency.setValueAtTime(baseFreq, this.audioContext.currentTime);
                 
-                // Modulate frequency for bubbling effect
-                const lfo = this.audioContext.createOscillator();
-                const lfoGain = this.audioContext.createGain();
-                lfo.type = 'sine';
-                lfo.frequency.setValueAtTime(Math.abs(velocity) * 0.1 + 5, this.audioContext.currentTime);
-                lfoGain.gain.setValueAtTime(baseFreq * 0.2, this.audioContext.currentTime);
+                // Volume modulation with sine wave (faster spinning = shorter sine waves)
+                const volumeLfo = this.audioContext.createOscillator();
+                const volumeLfoGain = this.audioContext.createGain();
+                volumeLfo.type = 'sine';
                 
-                lfo.connect(lfoGain);
-                lfoGain.connect(mainOsc.frequency);
+                // Frequency of volume oscillation increases with velocity
+                const volumeOscFreq = Math.abs(velocity) * 0.05 + 2; // Faster spinning = higher frequency
+                volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
+                volumeLfoGain.gain.setValueAtTime(0.3, this.audioContext.currentTime); // Modulation depth
+                
+                // Connect volume LFO to main gain
+                volumeLfo.connect(volumeLfoGain);
+                volumeLfoGain.connect(mainGain.gain);
+                
+                // Frequency modulation for bubbling effect
+                const freqLfo = this.audioContext.createOscillator();
+                const freqLfoGain = this.audioContext.createGain();
+                freqLfo.type = 'sine';
+                freqLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.1 + 5, this.audioContext.currentTime);
+                freqLfoGain.gain.setValueAtTime(baseFreq * 0.2, this.audioContext.currentTime);
+                
+                freqLfo.connect(freqLfoGain);
+                freqLfoGain.connect(mainOsc.frequency);
                 
                 // Secondary harmonics for richer sound
                 const harmonic = this.audioContext.createOscillator();
@@ -249,7 +231,7 @@
                 
                 harmonic.type = 'triangle';
                 harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
-                harmonicGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                harmonicGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
                 
                 // High frequency sparkle
                 const sparkle = this.audioContext.createOscillator();
@@ -257,7 +239,7 @@
                 
                 sparkle.type = 'square';
                 sparkle.frequency.setValueAtTime(baseFreq * 3, this.audioContext.currentTime);
-                sparkleGain.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+                sparkleGain.gain.setValueAtTime(0.05, this.audioContext.currentTime);
                 
                 // Connect everything
                 mainOsc.connect(mainGain);
@@ -268,26 +250,29 @@
                 harmonicGain.connect(this.masterGain);
                 sparkleGain.connect(this.masterGain);
                 
-                // Set initial volume based on velocity
-                const volume = Math.min(0.8, Math.abs(velocity) / 500);
-                mainGain.gain.setValueAtTime(volume, this.audioContext.currentTime);
+                // Set base volume
+                const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
+                mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
                 
                 // Start oscillators
                 const now = this.audioContext.currentTime;
                 mainOsc.start(now);
                 harmonic.start(now);
                 sparkle.start(now);
-                lfo.start(now);
+                freqLfo.start(now);
+                volumeLfo.start(now);
                 
                 oscillatorGroup.push({
                     main: mainOsc,
                     harmonic: harmonic,
                     sparkle: sparkle,
-                    lfo: lfo,
+                    freqLfo: freqLfo,
+                    volumeLfo: volumeLfo,
                     mainGain: mainGain,
                     harmonicGain: harmonicGain,
                     sparkleGain: sparkleGain,
-                    lfoGain: lfoGain
+                    freqLfoGain: freqLfoGain,
+                    volumeLfoGain: volumeLfoGain
                 });
                 
                 return oscillatorGroup[0];
@@ -297,17 +282,21 @@
                 if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
                 
                 const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
-                const volume = Math.min(0.8, Math.abs(velocity) / 500);
+                const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
+                const volumeOscFreq = Math.abs(velocity) * 0.05 + 2; // Faster = higher frequency sine waves
                 const now = this.audioContext.currentTime;
                 
                 // Update frequencies and volume smoothly
                 soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
                 soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
                 soundGroup.sparkle.frequency.exponentialRampToValueAtTime(baseFreq * 3, now + 0.1);
-                soundGroup.lfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
+                soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
                 
-                soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, volume), now + 0.1);
-                soundGroup.lfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.2, now + 0.1);
+                // Update volume oscillation frequency (faster spinning = shorter sine waves)
+                soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
+                
+                soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
+                soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.2, now + 0.1);
             }
             
             stopSound(soundGroup) {
@@ -327,7 +316,8 @@
                         soundGroup.main.stop();
                         soundGroup.harmonic.stop();
                         soundGroup.sparkle.stop();
-                        soundGroup.lfo.stop();
+                        soundGroup.freqLfo.stop();
+                        soundGroup.volumeLfo.stop();
                     } catch (e) {
                         // Oscillators might already be stopped
                     }
@@ -349,7 +339,6 @@
             constructor() {
                 this.star = document.getElementById('rotatingImage');
                 this.fallbackStar = document.getElementById('fallbackStar');
-                this.soundToggle = document.getElementById('soundToggle');
                 
                 this.rotation = 0;
                 this.velocity = 0; // degrees per second
@@ -374,6 +363,7 @@
                 
                 // Audio
                 this.audioEngine = new AudioEngine();
+                this.audioEngine.masterGain = null; // Remove the toggle functionality
                 this.currentSound = null;
                 
                 this.init();
@@ -388,18 +378,6 @@
                     this.star.style.display = 'none';
                     this.fallbackStar.style.display = 'block';
                     this.star = this.fallbackStar;
-                });
-                
-                // Sound toggle
-                this.soundToggle.addEventListener('click', () => {
-                    const isEnabled = this.audioEngine.toggle();
-                    this.soundToggle.textContent = isEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
-                    this.soundToggle.classList.toggle('active', isEnabled);
-                    
-                    if (!isEnabled && this.currentSound) {
-                        this.audioEngine.stopSound(this.currentSound);
-                        this.currentSound = null;
-                    }
                 });
                 
                 // Touch events for mobile
