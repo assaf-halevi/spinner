@@ -206,8 +206,8 @@
                 const volumeLfoGain = this.audioContext.createGain();
                 volumeLfo.type = 'sine';
                 
-                // Frequency of volume oscillation increases with velocity
-                const volumeOscFreq = Math.abs(velocity) * 0.05 + 2; // Faster spinning = higher frequency
+                // Frequency of volume oscillation increases with velocity (longer waves overall)
+                const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8; // Slower, longer waves
                 volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
                 volumeLfoGain.gain.setValueAtTime(0.3, this.audioContext.currentTime); // Modulation depth
                 
@@ -233,13 +233,13 @@
                 harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
                 harmonicGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
                 
-                // High frequency sparkle
+                // High frequency sparkle (reduced volume)
                 const sparkle = this.audioContext.createOscillator();
                 const sparkleGain = this.audioContext.createGain();
                 
                 sparkle.type = 'square';
                 sparkle.frequency.setValueAtTime(baseFreq * 3, this.audioContext.currentTime);
-                sparkleGain.gain.setValueAtTime(0.05, this.audioContext.currentTime);
+                sparkleGain.gain.setValueAtTime(0.02, this.audioContext.currentTime); // Much lower volume
                 
                 // Connect everything
                 mainOsc.connect(mainGain);
@@ -283,7 +283,7 @@
                 
                 const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
                 const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
-                const volumeOscFreq = Math.abs(velocity) * 0.05 + 2; // Faster = higher frequency sine waves
+                const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8; // Longer waves overall
                 const now = this.audioContext.currentTime;
                 
                 // Update frequencies and volume smoothly
