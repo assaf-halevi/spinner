@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Spinner</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff69b4">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            touch-action: none;
+        }
+
+        .game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .star-container {
+            width: 300px;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .star {
+            width: 200px;
+            height: 200px;
+            transition: transform 0.1s ease-out;
+            cursor: grab;
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+        }
+
+        .star:active {
+            cursor: grabbing;
+        }
+
+        .instructions {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            text-align: center;
+            font-size: 18px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .rotation-display {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .reset-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(-50%) scale(1.05);
+        }
+
+        /* Fallback star using CSS if image doesn't load */
+        .css-star {
+            width: 200px;
+            height: 200px;
+            background: #FFD700;
+            position: relative;
+            display: none;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="instructions">
+            Swipe to rotate the spinner!<br>
+            <small>Replace "star.png" with your own spinner image</small>
+        </div>
+        
+        <div class="star-container">
+            <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
+            <div class="css-star" id="fallbackStar"></div>
+        </div>
+        
+        <div class="rotation-display" id="rotationDisplay">
+            Rotation: 0°
+        </div>
+        
+        <button class="reset-btn" id="resetBtn">Reset Rotation</button>
+    </div>
+
+    <script>
+        class SwipeRotateGame {
+            constructor() {
+                this.star = document.getElementById('rotatingImage');
+                this.fallbackStar = document.getElementById('fallbackStar');
+                this.rotationDisplay = document.getElementById('rotationDisplay');
+                this.resetBtn = document.getElementById('resetBtn');
+                
+                this.rotation = 0;
+                this.isRotating = false;
+                this.startX = 0;
+                this.startY = 0;
+                this.centerX = 0;
+                this.centerY = 0;
+                
+                this.init();
+            }
+            
+            init() {
+                // Handle image load error - show CSS star as fallback
+                this.star.addEventListener('error', () => {
+                    this.star.style.display = 'none';
+                    this.fallbackStar.style.display = 'block';
+                    this.star = this.fallbackStar;
+                });
+                
+                // Touch events for mobile
+                this.star.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
+                this.star.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
+                this.star.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
+                
+                // Mouse events for desktop testing
+                this.star.addEventListener('mousedown', this.handleStart.bind(this));
+                this.star.addEventListener('mousemove', this.handleMove.bind(this));
+                this.star.addEventListener('mouseup', this.handleEnd.bind(this));
+                this.star.addEventListener('mouseleave', this.handleEnd.bind(this));
+                
+                // Reset button
+                this.resetBtn.addEventListener('click', this.resetRotation.bind(this));
+                
+                // Prevent context menu on long press
+                this.star.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                this.updateDisplay();
+            }
+            
+            handleStart(e) {
+                e.preventDefault();
+                this.isRotating = true;
+                
+                const rect = this.star.getBoundingClientRect();
+                this.centerX = rect.left + rect.width / 2;
+                this.centerY = rect.top + rect.height / 2;
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                this.startX = clientX;
+                this.startY = clientY;
+            }
+            
+            handleMove(e) {
+                if (!this.isRotating) return;
+                e.preventDefault();
+                
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                // Calculate the angle from center to current position
+                const deltaX = clientX - this.centerX;
+                const deltaY = clientY - this.centerY;
+                const currentAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+                
+                // Calculate the angle from center to start position
+                const startDeltaX = this.startX - this.centerX;
+                const startDeltaY = this.startY - this.centerY;
+                const startAngle = Math.atan2(startDeltaY, startDeltaX) * (180 / Math.PI);
+                
+                // Calculate rotation difference
+                let angleDiff = currentAngle - startAngle;
+                
+                // Normalize angle difference to prevent jumps
+                if (angleDiff > 180) angleDiff -= 360;
+                if (angleDiff < -180) angleDiff += 360;
+                
+                this.rotation += angleDiff * 0.5; // Reduce sensitivity
+                
+                // Update start position for next calculation
+                this.startX = clientX;
+                this.startY = clientY;
+                
+                this.updateRotation();
+                this.updateDisplay();
+            }
+            
+            handleEnd(e) {
+                this.isRotating = false;
+            }
+            
+            updateRotation() {
+                this.star.style.transform = `rotate(${this.rotation}deg)`;
+            }
+            
+            updateDisplay() {
+                const normalizedRotation = ((this.rotation % 360) + 360) % 360;
+                this.rotationDisplay.textContent = `Rotation: ${Math.round(normalizedRotation)}°`;
+            }
+            
+            resetRotation() {
+                this.rotation = 0;
+                this.updateRotation();
+                this.updateDisplay();
+            }
+        }
+        
+        // Start the game when page loads
+        window.addEventListener('load', () => {
+            new SwipeRotateGame();
+        });
+        
+        // Prevent scrolling and zooming on mobile
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        document.addEventListener('gesturestart', (e) => {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('gesturechange', (e) => {
+            e.preventDefault();
+        });
+    </script>
+</body>
+</html>
