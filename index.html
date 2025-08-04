@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Momentum Spinner</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#ff69b4">
     <style>
         * {
             margin: 0;
@@ -15,24 +13,12 @@
 
         body {
             background: #000000;
-            font-family: Arial, sans-serif;
             overflow: hidden;
             height: 100vh;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             touch-action: none;
-        }
-
-        .game-container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
         }
 
         .star-container {
@@ -59,67 +45,6 @@
             cursor: default;
         }
 
-        .instructions {
-            position: absolute;
-            top: 50px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            text-align: center;
-            font-size: 18px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .rotation-display {
-            position: absolute;
-            bottom: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 20px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-        }
-
-        .velocity-display {
-            position: absolute;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 18px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 16px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-
-        .reset-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 2px solid white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 16px;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-        }
-
-        .reset-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateX(-50%) scale(1.05);
-        }
-
         /* Fallback star using CSS if image doesn't load */
         .css-star {
             width: 100vmin;
@@ -129,196 +54,15 @@
             display: none;
             clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
         }
-
-        .status-indicator {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: white;
-            font-size: 14px;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 5px 10px;
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-        }
-
-        .spinning {
-            color: #00ff00 !important;
-        }
-
-
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <div class="star-container">
-            <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
-            <div class="css-star" id="fallbackStar"></div>
-        </div>
+    <div class="star-container">
+        <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
+        <div class="css-star" id="fallbackStar"></div>
     </div>
 
     <script>
-        class AudioEngine {
-            constructor() {
-                this.audioContext = null;
-                this.masterGain = null;
-                this.oscillators = [];
-                this.isEnabled = true;
-                this.isInitialized = false;
-            }
-            
-            async init() {
-                if (this.isInitialized) return;
-                
-                try {
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    this.masterGain = this.audioContext.createGain();
-                    this.masterGain.connect(this.audioContext.destination);
-                    this.masterGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                    this.isInitialized = true;
-                } catch (error) {
-                    console.warn('Audio not supported:', error);
-                    this.isEnabled = false;
-                }
-            }
-            
-            createBubblingSound(velocity) {
-                if (!this.isEnabled || !this.isInitialized) return null;
-                
-                // Resume audio context if suspended (browser policy)
-                if (this.audioContext.state === 'suspended') {
-                    this.audioContext.resume();
-                }
-                
-                // Create multiple oscillators for complex bubbling sound
-                const oscillatorGroup = [];
-                const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
-                
-                // Main bubble tone
-                const mainOsc = this.audioContext.createOscillator();
-                const mainGain = this.audioContext.createGain();
-                
-                mainOsc.type = 'sine';
-                mainOsc.frequency.setValueAtTime(baseFreq, this.audioContext.currentTime);
-                
-                // Volume modulation with sine wave (faster spinning = shorter sine waves)
-                const volumeLfo = this.audioContext.createOscillator();
-                const volumeLfoGain = this.audioContext.createGain();
-                volumeLfo.type = 'sine';
-                
-                // Frequency of volume oscillation increases with velocity (longer waves overall)
-                const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8; // Slower, longer waves
-                volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
-                volumeLfoGain.gain.setValueAtTime(0.3, this.audioContext.currentTime); // Modulation depth
-                
-                // Connect volume LFO to main gain
-                volumeLfo.connect(volumeLfoGain);
-                volumeLfoGain.connect(mainGain.gain);
-                
-                // Frequency modulation for bubbling effect
-                const freqLfo = this.audioContext.createOscillator();
-                const freqLfoGain = this.audioContext.createGain();
-                freqLfo.type = 'sine';
-                freqLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.1 + 5, this.audioContext.currentTime);
-                freqLfoGain.gain.setValueAtTime(baseFreq * 0.2, this.audioContext.currentTime);
-                
-                freqLfo.connect(freqLfoGain);
-                freqLfoGain.connect(mainOsc.frequency);
-                
-                // Secondary harmonics for richer sound
-                const harmonic = this.audioContext.createOscillator();
-                const harmonicGain = this.audioContext.createGain();
-                
-                harmonic.type = 'triangle';
-                harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
-                harmonicGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
-                
-                // Connect everything
-                mainOsc.connect(mainGain);
-                harmonic.connect(harmonicGain);
-                
-                mainGain.connect(this.masterGain);
-                harmonicGain.connect(this.masterGain);
-                
-                // Set base volume
-                const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
-                mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
-                
-                // Start oscillators
-                const now = this.audioContext.currentTime;
-                mainOsc.start(now);
-                harmonic.start(now);
-                freqLfo.start(now);
-                volumeLfo.start(now);
-                
-                oscillatorGroup.push({
-                    main: mainOsc,
-                    harmonic: harmonic,
-                    freqLfo: freqLfo,
-                    volumeLfo: volumeLfo,
-                    mainGain: mainGain,
-                    harmonicGain: harmonicGain,
-                    freqLfoGain: freqLfoGain,
-                    volumeLfoGain: volumeLfoGain
-                });
-                
-                return oscillatorGroup[0];
-            }
-            
-            updateSound(soundGroup, velocity) {
-                if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
-                
-                const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
-                const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
-                const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8; // Longer waves overall
-                const now = this.audioContext.currentTime;
-                
-                // Update frequencies and volume smoothly
-                soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
-                soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
-                soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
-                
-                // Update volume oscillation frequency (faster spinning = shorter sine waves)
-                soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
-                
-                soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
-                soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.2, now + 0.1);
-            }
-            
-            stopSound(soundGroup) {
-                if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
-                
-                const now = this.audioContext.currentTime;
-                const fadeTime = 0.1; // Much faster fade for immediate stop
-                
-                // Immediate fade out
-                soundGroup.mainGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-                soundGroup.harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-                
-                // Stop oscillators after fade
-                setTimeout(() => {
-                    try {
-                        soundGroup.main.stop();
-                        soundGroup.harmonic.stop();
-                        soundGroup.freqLfo.stop();
-                        soundGroup.volumeLfo.stop();
-                    } catch (e) {
-                        // Oscillators might already be stopped
-                    }
-                }, fadeTime * 1000 + 50); // Shorter timeout
-            }
-            
-            toggle() {
-                this.isEnabled = !this.isEnabled;
-                if (!this.isEnabled && this.masterGain) {
-                    this.masterGain.gain.setValueAtTime(0, this.audioContext.currentTime);
-                } else if (this.isEnabled && this.masterGain) {
-                    this.masterGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                }
-                return this.isEnabled;
-            }
-        }
-
         class MomentumSpinner {
             constructor() {
                 this.star = document.getElementById('rotatingImage');
@@ -339,23 +83,34 @@
                 this.velocityHistory = [];
                 
                 // Physics constants
-                this.friction = 0.99; // Velocity decay per frame (more friction)
+                this.friction = 0.99; // Velocity decay per frame
                 this.minVelocity = 5; // Stop spinning below this velocity
-                this.velocityMultiplier = 2; // Reduce velocity amplification
+                this.velocityMultiplier = 2;
+                
+                // Audio system
+                this.audioContext = null;
+                this.audioBuffers = {};
+                this.currentAudioZone = 0;
+                this.currentSource = null;
+                this.gainNode = null;
+                
+                // EASILY ADJUSTABLE SPEED RANGES (degrees per second)
+                this.speedRanges = [
+                    { min: 5,   max: 50,  file: '1.mp3' },  // Zone 1
+                    { min: 50,  max: 150, file: '2.mp3' },  // Zone 2  
+                    { min: 150, max: 300, file: '3.mp3' },  // Zone 3
+                    { min: 300, max: 500, file: '4.mp3' },  // Zone 4
+                    { min: 500, max: Infinity, file: '5.mp3' }  // Zone 5
+                ];
                 
                 this.animationId = null;
-                
-                // Audio
-                this.audioEngine = new AudioEngine();
-                this.audioEngine.masterGain = null; // Remove the toggle functionality
-                this.currentSound = null;
                 
                 this.init();
             }
             
             async init() {
-                // Initialize audio
-                await this.audioEngine.init();
+                // Initialize audio system
+                await this.initAudioSystem();
                 
                 // Handle image load error - show CSS star as fallback
                 this.star.addEventListener('error', () => {
@@ -369,7 +124,7 @@
                 this.star.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
                 this.star.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
                 
-                // Mouse events for desktop testing
+                // Mouse events for desktop
                 this.star.addEventListener('mousedown', this.handleStart.bind(this));
                 this.star.addEventListener('mousemove', this.handleMove.bind(this));
                 this.star.addEventListener('mouseup', this.handleEnd.bind(this));
@@ -382,12 +137,93 @@
                 this.animate();
             }
             
+            async initAudioSystem() {
+                try {
+                    // Create audio context
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Create gain node for volume control
+                    this.gainNode = this.audioContext.createGain();
+                    this.gainNode.connect(this.audioContext.destination);
+                    
+                    // Load all audio files
+                    await this.loadAudioFiles();
+                    
+                } catch (error) {
+                    console.error('Audio initialization failed:', error);
+                }
+            }
+            
+            async loadAudioFiles() {
+                const loadPromises = this.speedRanges.map(async (range, index) => {
+                    try {
+                        const response = await fetch(range.file);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const arrayBuffer = await response.arrayBuffer();
+                        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                        this.audioBuffers[index + 1] = audioBuffer;
+                    } catch (error) {
+                        console.error(`Failed to load ${range.file}:`, error);
+                        // Continue without this audio file
+                    }
+                });
+                
+                await Promise.all(loadPromises);
+            }
+            
+            getSpeedZone(velocity) {
+                const absVelocity = Math.abs(velocity);
+                
+                for (let i = 0; i < this.speedRanges.length; i++) {
+                    const range = this.speedRanges[i];
+                    if (absVelocity >= range.min && absVelocity < range.max) {
+                        return i + 1; // Return zone number (1-5)
+                    }
+                }
+                
+                return 0; // No zone (silent)
+            }
+            
+            playAudioForZone(zone) {
+                if (!this.audioContext || zone === this.currentAudioZone || !this.audioBuffers[zone]) {
+                    return;
+                }
+                
+                // Stop current audio
+                this.stopCurrentAudio();
+                
+                // Start new audio for the zone
+                const audioBuffer = this.audioBuffers[zone];
+                const source = this.audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.loop = true;
+                source.connect(this.gainNode);
+                source.start();
+                
+                this.currentSource = source;
+                this.currentAudioZone = zone;
+            }
+            
+            stopCurrentAudio() {
+                if (this.currentSource) {
+                    try {
+                        this.currentSource.stop();
+                    } catch (e) {
+                        // Source might already be stopped
+                    }
+                    this.currentSource = null;
+                }
+                this.currentAudioZone = 0;
+            }
+            
             handleStart(e) {
                 e.preventDefault();
                 
-                // Initialize audio context on first user interaction
-                if (!this.audioEngine.isInitialized) {
-                    this.audioEngine.init();
+                // Initialize audio context on first user interaction if needed
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
                 }
                 
                 // Stop any current spinning
@@ -479,23 +315,13 @@
             startSpinning() {
                 this.isSpinning = true;
                 this.star.classList.add('spinning');
-                
-                // Start bubbling sound
-                if (this.audioEngine.isEnabled) {
-                    this.currentSound = this.audioEngine.createBubblingSound(this.velocity);
-                }
             }
             
             stopSpinning() {
                 this.isSpinning = false;
                 this.velocity = 0;
                 this.star.classList.remove('spinning');
-                
-                // Stop sound
-                if (this.currentSound) {
-                    this.audioEngine.stopSound(this.currentSound);
-                    this.currentSound = null;
-                }
+                this.stopCurrentAudio();
             }
             
             animate() {
@@ -504,11 +330,6 @@
                     // Apply friction
                     this.velocity *= this.friction;
                     
-                    // Update sound based on current velocity
-                    if (this.currentSound && this.audioEngine.isEnabled) {
-                        this.audioEngine.updateSound(this.currentSound, this.velocity);
-                    }
-                    
                     // Stop spinning if velocity is too low
                     if (Math.abs(this.velocity) < this.minVelocity) {
                         this.stopSpinning();
@@ -516,6 +337,14 @@
                         // Update rotation based on velocity
                         this.rotation += this.velocity / 60; // Assuming 60fps
                         this.updateRotation();
+                        
+                        // Update audio based on current velocity
+                        const zone = this.getSpeedZone(this.velocity);
+                        if (zone > 0) {
+                            this.playAudioForZone(zone);
+                        } else {
+                            this.stopCurrentAudio();
+                        }
                     }
                 }
                 
@@ -547,4 +376,3 @@
     </script>
 </body>
 </html>
-
