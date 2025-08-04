@@ -92,7 +92,10 @@
                 this.audioBuffers = {};
                 this.currentAudioZone = 0;
                 this.currentSource = null;
-                this.gainNode = null;
+                this.currentGainNode = null;
+                this.masterGainNode = null;
+                this.fadeOutTime = 0.3; // Quick fade out duration in seconds
+                this.crossFadeTime = 0.5; // Cross fade duration between zones
                 
                 // EASILY ADJUSTABLE SPEED RANGES (degrees per second)
                 this.speedRanges = [
@@ -142,10 +145,9 @@
                     // Create audio context
                     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     
-                    // Create gain node for volume control
-                    this.gainNode = this.audioContext.createGain();
-                    this.gainNode.connect(this.audioContext.destination);
-                    this.gainNode.gain.value = 1.0;
+                    // Create master gain node for volume control
+                    this.masterGainNode = this.audioContext.createGain();
+                    this.masterGainNode.connect(this.audioContext.destination);
                     
                     // Load all audio files
                     await this.loadAudioFiles();
@@ -187,55 +189,76 @@
                 return 0; // No zone (silent)
             }
             
-            playAudioForInitialSpeed(velocity) {
-                if (!this.audioContext || this.currentSource) {
-                    return; // Don't change audio if already playing
+            playAudioForZone(zone) {
+                if (!this.audioContext || !this.audioBuffers[zone]) {
+                    return;
                 }
                 
-                const zone = this.getSpeedZone(velocity);
-                if (zone > 0 && this.audioBuffers[zone]) {
-                    // Reset gain to full volume
-                    this.gainNode.gain.cancelScheduledValues(this.audioContext.currentTime);
-                    this.gainNode.gain.value = 1.0;
-                    
-                    // Start new audio for the zone
-                    const audioBuffer = this.audioBuffers[zone];
-                    const source = this.audioContext.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.loop = true;
-                    source.connect(this.gainNode);
-                    source.start();
-                    
-                    this.currentSource = source;
-                    this.currentAudioZone = zone;
+                // If same zone, do nothing
+                if (zone === this.currentAudioZone) {
+                    return;
                 }
-            }
-            
-            fadeOutAndStopAudio() {
-                if (this.currentSource && this.gainNode) {
-                    const fadeTime = 1.0; // 1 second fade out
-                    const currentTime = this.audioContext.currentTime;
+                
+                // Create new audio source with its own gain node for independent volume control
+                const audioBuffer = this.audioBuffers[zone];
+                const newSource = this.audioContext.createBufferSource();
+                const newGainNode = this.audioContext.createGain();
+                
+                newSource.buffer = audioBuffer;
+                newSource.loop = true;
+                newSource.connect(newGainNode);
+                newGainNode.connect(this.masterGainNode);
+                
+                // Start with volume at 0 for smooth fade in
+                newGainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+                newSource.start();
+                
+                // Fade in new audio
+                newGainNode.gain.linearRampToValueAtTime(1, this.audioContext.currentTime + this.crossFadeTime);
+                
+                // If there's current audio playing, cross-fade it out
+                if (this.currentSource && this.currentGainNode) {
+                    const oldSource = this.currentSource;
+                    const oldGainNode = this.currentGainNode;
                     
-                    // Cancel any scheduled changes and start fade from current value
-                    this.gainNode.gain.cancelScheduledValues(currentTime);
-                    this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+                    // Fade out old audio
+                    oldGainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + this.crossFadeTime);
                     
-                    // Fade to 0 over fadeTime seconds
-                    this.gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeTime);
-                    
-                    // Stop the source after fade completes
+                    // Stop old source after fade out completes
                     setTimeout(() => {
                         try {
-                            if (this.currentSource) {
-                                this.currentSource.stop();
-                                this.currentSource = null;
-                            }
+                            oldSource.stop();
                         } catch (e) {
                             // Source might already be stopped
                         }
-                        this.currentAudioZone = 0;
-                    }, fadeTime * 1000);
+                    }, this.crossFadeTime * 1000 + 100); // Add small buffer
                 }
+                
+                // Update current references
+                this.currentSource = newSource;
+                this.currentGainNode = newGainNode;
+                this.currentAudioZone = zone;
+            }
+            
+            stopCurrentAudio() {
+                if (this.currentSource && this.currentGainNode) {
+                    // Quick fade out when stopping
+                    this.currentGainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + this.fadeOutTime);
+                    
+                    // Stop source after fade out
+                    const sourceToStop = this.currentSource;
+                    setTimeout(() => {
+                        try {
+                            sourceToStop.stop();
+                        } catch (e) {
+                            // Source might already be stopped
+                        }
+                    }, this.fadeOutTime * 1000 + 50);
+                    
+                    this.currentSource = null;
+                    this.currentGainNode = null;
+                }
+                this.currentAudioZone = 0;
             }
             
             handleStart(e) {
@@ -326,8 +349,6 @@
                     // Start spinning if velocity is significant
                     if (Math.abs(this.velocity) > this.minVelocity) {
                         this.startSpinning();
-                        // Play audio based on INITIAL velocity only
-                        this.playAudioForInitialSpeed(this.velocity);
                     }
                 }
                 
@@ -343,7 +364,7 @@
                 this.isSpinning = false;
                 this.velocity = 0;
                 this.star.classList.remove('spinning');
-                this.fadeOutAndStopAudio();
+                this.stopCurrentAudio();
             }
             
             animate() {
@@ -360,7 +381,13 @@
                         this.rotation += this.velocity / 60; // Assuming 60fps
                         this.updateRotation();
                         
-                        // Audio continues playing from initial selection - no changes during spin
+                        // Update audio based on current velocity
+                        const zone = this.getSpeedZone(this.velocity);
+                        if (zone > 0) {
+                            this.playAudioForZone(zone);
+                        } else {
+                            this.stopCurrentAudio();
+                        }
                     }
                 }
                 
