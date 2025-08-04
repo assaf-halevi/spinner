@@ -145,6 +145,7 @@
                     // Create gain node for volume control
                     this.gainNode = this.audioContext.createGain();
                     this.gainNode.connect(this.audioContext.destination);
+                    this.gainNode.gain.value = 1.0;
                     
                     // Load all audio files
                     await this.loadAudioFiles();
@@ -186,36 +187,55 @@
                 return 0; // No zone (silent)
             }
             
-            playAudioForZone(zone) {
-                if (!this.audioContext || zone === this.currentAudioZone || !this.audioBuffers[zone]) {
-                    return;
+            playAudioForInitialSpeed(velocity) {
+                if (!this.audioContext || this.currentSource) {
+                    return; // Don't change audio if already playing
                 }
                 
-                // Stop current audio
-                this.stopCurrentAudio();
-                
-                // Start new audio for the zone
-                const audioBuffer = this.audioBuffers[zone];
-                const source = this.audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.loop = true;
-                source.connect(this.gainNode);
-                source.start();
-                
-                this.currentSource = source;
-                this.currentAudioZone = zone;
+                const zone = this.getSpeedZone(velocity);
+                if (zone > 0 && this.audioBuffers[zone]) {
+                    // Reset gain to full volume
+                    this.gainNode.gain.cancelScheduledValues(this.audioContext.currentTime);
+                    this.gainNode.gain.value = 1.0;
+                    
+                    // Start new audio for the zone
+                    const audioBuffer = this.audioBuffers[zone];
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.loop = true;
+                    source.connect(this.gainNode);
+                    source.start();
+                    
+                    this.currentSource = source;
+                    this.currentAudioZone = zone;
+                }
             }
             
-            stopCurrentAudio() {
-                if (this.currentSource) {
-                    try {
-                        this.currentSource.stop();
-                    } catch (e) {
-                        // Source might already be stopped
-                    }
-                    this.currentSource = null;
+            fadeOutAndStopAudio() {
+                if (this.currentSource && this.gainNode) {
+                    const fadeTime = 1.0; // 1 second fade out
+                    const currentTime = this.audioContext.currentTime;
+                    
+                    // Cancel any scheduled changes and start fade from current value
+                    this.gainNode.gain.cancelScheduledValues(currentTime);
+                    this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+                    
+                    // Fade to 0 over fadeTime seconds
+                    this.gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeTime);
+                    
+                    // Stop the source after fade completes
+                    setTimeout(() => {
+                        try {
+                            if (this.currentSource) {
+                                this.currentSource.stop();
+                                this.currentSource = null;
+                            }
+                        } catch (e) {
+                            // Source might already be stopped
+                        }
+                        this.currentAudioZone = 0;
+                    }, fadeTime * 1000);
                 }
-                this.currentAudioZone = 0;
             }
             
             handleStart(e) {
@@ -306,6 +326,8 @@
                     // Start spinning if velocity is significant
                     if (Math.abs(this.velocity) > this.minVelocity) {
                         this.startSpinning();
+                        // Play audio based on INITIAL velocity only
+                        this.playAudioForInitialSpeed(this.velocity);
                     }
                 }
                 
@@ -321,7 +343,7 @@
                 this.isSpinning = false;
                 this.velocity = 0;
                 this.star.classList.remove('spinning');
-                this.stopCurrentAudio();
+                this.fadeOutAndStopAudio();
             }
             
             animate() {
@@ -338,13 +360,7 @@
                         this.rotation += this.velocity / 60; // Assuming 60fps
                         this.updateRotation();
                         
-                        // Update audio based on current velocity
-                        const zone = this.getSpeedZone(this.velocity);
-                        if (zone > 0) {
-                            this.playAudioForZone(zone);
-                        } else {
-                            this.stopCurrentAudio();
-                        }
+                        // Audio continues playing from initial selection - no changes during spin
                     }
                 }
                 
