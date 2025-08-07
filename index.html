@@ -100,25 +100,7 @@
             clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
         }
 
-        .back-button {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid #FFD700;
-            color: #FFD700;
-            padding: 10px 20px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-        }
 
-        .back-button:hover {
-            background: rgba(255, 215, 0, 0.2);
-            transform: scale(1.05);
-        }
 
         /* Responsive design */
         @media (max-width: 768px) {
@@ -165,7 +147,6 @@
 
     <!-- Game Screen -->
     <div class="game-screen" id="gameScreen">
-        <button class="back-button" id="backButton">← Back to Selection</button>
         <img class="star" src="" alt="Spinner" id="rotatingImage">
         <div class="css-star" id="fallbackStar"></div>
     </div>
@@ -524,7 +505,6 @@
         let currentSpinner = null;
         const openingScreen = document.getElementById('openingScreen');
         const gameScreen = document.getElementById('gameScreen');
-        const backButton = document.getElementById('backButton');
         
         // Function to show opening screen
         function showOpeningScreen() {
@@ -554,9 +534,6 @@
                 showGameScreen(selectedType);
             });
         });
-        
-        // Back button functionality
-        backButton.addEventListener('click', showOpeningScreen);
         
         // Start with opening screen when page loads
         window.addEventListener('load', () => {
