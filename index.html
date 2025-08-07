@@ -19,12 +19,57 @@
             justify-content: center;
             align-items: center;
             touch-action: none;
+            font-family: Arial, sans-serif;
         }
 
-        .star-container {
+        /* Opening Screen Styles */
+        .opening-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+            background: #000000;
+            gap: 10vw;
+        }
+
+        .selection-container {
+            display: flex;
+            gap: 10vw;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .star-option {
+            cursor: pointer;
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
+
+        .star-option:hover {
+            transform: scale(1.1);
+            filter: brightness(1.2);
+        }
+
+        .star-option:active {
+            transform: scale(1.05);
+        }
+
+        .star-preview {
+            width: 35vmin;
+            height: 35vmin;
+            object-fit: contain;
+        }
+
+        .star-preview.fallback {
+            background: #FFD700;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+
+        /* Game Screen Styles */
+        .game-screen {
             width: 100vmin;
             height: 100vmin;
-            display: flex;
+            display: none;
             justify-content: center;
             align-items: center;
             position: relative;
@@ -54,19 +99,86 @@
             display: none;
             clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
         }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #FFD700;
+            color: #FFD700;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-button:hover {
+            background: rgba(255, 215, 0, 0.2);
+            transform: scale(1.05);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+                margin-bottom: 2rem;
+            }
+            
+            .selection-container {
+                gap: 2rem;
+            }
+            
+            .star-preview {
+                width: 150px;
+                height: 150px;
+            }
+            
+            .star-label {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="star-container">
-        <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
+    <!-- Opening Screen -->
+    <div class="opening-screen" id="openingScreen">
+        <div class="selection-container">
+            <div class="star-option" data-type="A">
+                <img class="star-preview" src="starA.png" alt="Star A" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="star-preview fallback" style="display: none;"></div>
+            </div>
+            
+            <div class="star-option" data-type="L">
+                <img class="star-preview" src="starL.png" alt="Star L" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="star-preview fallback" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div class="game-screen" id="gameScreen">
+        <button class="back-button" id="backButton">← Back to Selection</button>
+        <img class="star" src="" alt="Spinner" id="rotatingImage">
         <div class="css-star" id="fallbackStar"></div>
     </div>
 
     <script>
         class MomentumSpinner {
-            constructor() {
+            constructor(selectedType) {
+                this.selectedType = selectedType;
                 this.star = document.getElementById('rotatingImage');
                 this.fallbackStar = document.getElementById('fallbackStar');
+                
+                // Set the correct image source based on selection
+                this.star.src = `star${selectedType}.png`;
                 
                 this.rotation = 0;
                 this.velocity = 0; // degrees per second
@@ -98,12 +210,13 @@
                 this.crossFadeTime = 1; // Cross fade duration between zones
                 
                 // EASILY ADJUSTABLE SPEED RANGES (degrees per second)
+                // Audio files are now based on selected type (A or L)
                 this.speedRanges = [
-                    { min: 5,   max: 250,  file: '1.mp3' },  // Zone 1
-                    { min: 250,  max: 500, file: '2.mp3' },  // Zone 2  
-                    { min: 500, max: 1000, file: '3.mp3' },  // Zone 3
-                    { min: 1000, max: 2000, file: '4.mp3' },  // Zone 4
-                    { min: 2000, max: Infinity, file: '5.mp3' }  // Zone 5
+                    { min: 5,   max: 250,  file: `1${selectedType}.mp3` },  // Zone 1
+                    { min: 250,  max: 500, file: `2${selectedType}.mp3` },  // Zone 2  
+                    { min: 500, max: 1000, file: `3${selectedType}.mp3` },  // Zone 3
+                    { min: 1000, max: 2000, file: `4${selectedType}.mp3` },  // Zone 4
+                    { min: 2000, max: Infinity, file: `5${selectedType}.mp3` }  // Zone 5
                 ];
                 
                 this.animationId = null;
@@ -397,11 +510,57 @@
             updateRotation() {
                 this.star.style.transform = `rotate(${this.rotation}deg)`;
             }
+            
+            destroy() {
+                // Clean up animation frame and audio
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                this.stopCurrentAudio();
+            }
         }
         
-        // Start the game when page loads
+        // Global variables for screen management
+        let currentSpinner = null;
+        const openingScreen = document.getElementById('openingScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const backButton = document.getElementById('backButton');
+        
+        // Function to show opening screen
+        function showOpeningScreen() {
+            openingScreen.style.display = 'flex';
+            gameScreen.style.display = 'none';
+            
+            // Destroy current spinner if it exists
+            if (currentSpinner) {
+                currentSpinner.destroy();
+                currentSpinner = null;
+            }
+        }
+        
+        // Function to show game screen with selected type
+        function showGameScreen(selectedType) {
+            openingScreen.style.display = 'none';
+            gameScreen.style.display = 'flex';
+            
+            // Create new spinner with selected type
+            currentSpinner = new MomentumSpinner(selectedType);
+        }
+        
+        // Event listeners for star selection
+        document.querySelectorAll('.star-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                const selectedType = e.currentTarget.dataset.type;
+                showGameScreen(selectedType);
+            });
+        });
+        
+        // Back button functionality
+        backButton.addEventListener('click', showOpeningScreen);
+        
+        // Start with opening screen when page loads
         window.addEventListener('load', () => {
-            new MomentumSpinner();
+            showOpeningScreen();
         });
         
         // Prevent scrolling and zooming on mobile
@@ -419,6 +578,3 @@
     </script>
 </body>
 </html>
-
-
-
