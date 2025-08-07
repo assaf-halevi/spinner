@@ -139,7 +139,7 @@
             </div>
             
             <div class="star-option" data-type="L">
-                <img class="star-preview" src="starL.png" alt="Star L" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img class="star-preview" src="starL.gif" alt="Star L" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <div class="star-preview fallback" style="display: none;"></div>
             </div>
         </div>
@@ -159,7 +159,12 @@
                 this.fallbackStar = document.getElementById('fallbackStar');
                 
                 // Set the correct image source based on selection
-                this.star.src = `star${selectedType}.png`;
+                // Use .gif for type L, .png for type A
+                if (selectedType === 'L') {
+                    this.star.src = `starL.gif`;
+                } else {
+                    this.star.src = `star${selectedType}.png`;
+                }
                 
                 this.rotation = 0;
                 this.velocity = 0; // degrees per second
