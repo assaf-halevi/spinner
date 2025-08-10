@@ -516,39 +516,41 @@
             new MomentumSpinner();
         });
         
-        // Prevent scrolling and zooming on mobile - but only for the spinner area
+        // Prevent scrolling and zooming on mobile - lock entire screen except system gestures
         document.addEventListener('touchstart', (e) => {
-            // Only prevent default if touching the spinner
-            const target = e.target;
-            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
-                target.closest('.star-container')) {
-                e.preventDefault();
+            // Allow system swipe-up from bottom edge (for closing app)
+            const touch = e.touches[0];
+            const screenHeight = window.innerHeight;
+            const bottomEdgeThreshold = 50; // pixels from bottom
+            
+            // If touch starts near bottom edge, don't prevent (allow system gesture)
+            if (touch.clientY > screenHeight - bottomEdgeThreshold) {
+                return; // Let system handle it
             }
+            
+            // Otherwise, prevent all default behavior
+            e.preventDefault();
         }, { passive: false });
         
         document.addEventListener('touchmove', (e) => {
-            // Only prevent scrolling if touching the spinner
-            const target = e.target;
-            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
-                target.closest('.star-container')) {
-                e.preventDefault();
+            // Allow system swipe-up from bottom edge
+            const touch = e.touches[0];
+            const screenHeight = window.innerHeight;
+            const bottomEdgeThreshold = 50;
+            
+            if (touch.clientY > screenHeight - bottomEdgeThreshold) {
+                return; // Let system handle it
             }
+            
+            e.preventDefault();
         }, { passive: false });
         
         document.addEventListener('gesturestart', (e) => {
-            const target = e.target;
-            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
-                target.closest('.star-container')) {
-                e.preventDefault();
-            }
+            e.preventDefault();
         });
         
         document.addEventListener('gesturechange', (e) => {
-            const target = e.target;
-            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
-                target.closest('.star-container')) {
-                e.preventDefault();
-            }
+            e.preventDefault();
         });
     </script>
 </body>
