@@ -126,8 +126,16 @@
                 const isClockwise = velocity > 0;
                 const absVelocity = Math.abs(velocity);
                 
-                // Same instrument type (sine wave bubbling), different pitch directions
-                const baseFreq = Math.max(150, absVelocity * 2 + 250);
+                // Different starting frequencies - Quinta (perfect fifth) apart
+                // If base frequency is C, the quinta is G (1.5x frequency ratio)
+                let baseFreq;
+                if (isClockwise) {
+                    // Clockwise: Higher starting pitch (quinta above)
+                    baseFreq = Math.max(225, absVelocity * 3 + 375); // 1.5x higher base
+                } else {
+                    // Counter-clockwise: Lower starting pitch (fundamental)
+                    baseFreq = Math.max(150, absVelocity * 2 + 250); // Original base
+                }
                 
                 // Main oscillator - always sine wave
                 const mainOsc = this.audioContext.createOscillator();
@@ -228,7 +236,15 @@
                 
                 const absVelocity = Math.abs(velocity);
                 const isClockwise = velocity > 0;
-                const baseFreq = Math.max(150, absVelocity * 2 + 250);
+                
+                // Different base frequencies - Quinta apart
+                let baseFreq;
+                if (isClockwise) {
+                    baseFreq = Math.max(225, absVelocity * 3 + 375); // Higher quinta
+                } else {
+                    baseFreq = Math.max(150, absVelocity * 2 + 250); // Lower fundamental
+                }
+                
                 const baseVolume = Math.min(0.45, absVelocity / 700);
                 const volumeOscFreq = absVelocity * 0.03 + 1.2;
                 const now = this.audioContext.currentTime;
