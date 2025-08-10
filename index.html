@@ -348,18 +348,18 @@
                     this.star = this.fallbackStar;
                 });
                 
-                // Touch events for mobile
+                // Touch events for mobile - only on the star itself
                 this.star.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
                 this.star.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
                 this.star.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
                 
-                // Mouse events for desktop testing
+                // Mouse events for desktop testing - only on the star itself
                 this.star.addEventListener('mousedown', this.handleStart.bind(this));
                 this.star.addEventListener('mousemove', this.handleMove.bind(this));
                 this.star.addEventListener('mouseup', this.handleEnd.bind(this));
                 this.star.addEventListener('mouseleave', this.handleEnd.bind(this));
                 
-                // Prevent context menu on long press
+                // Prevent context menu on long press - only on the star
                 this.star.addEventListener('contextmenu', (e) => e.preventDefault());
                 
                 // Start animation loop
@@ -516,17 +516,39 @@
             new MomentumSpinner();
         });
         
-        // Prevent scrolling and zooming on mobile
+        // Prevent scrolling and zooming on mobile - but only for the spinner area
+        document.addEventListener('touchstart', (e) => {
+            // Only prevent default if touching the spinner
+            const target = e.target;
+            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
+                target.closest('.star-container')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
         document.addEventListener('touchmove', (e) => {
-            e.preventDefault();
+            // Only prevent scrolling if touching the spinner
+            const target = e.target;
+            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
+                target.closest('.star-container')) {
+                e.preventDefault();
+            }
         }, { passive: false });
         
         document.addEventListener('gesturestart', (e) => {
-            e.preventDefault();
+            const target = e.target;
+            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
+                target.closest('.star-container')) {
+                e.preventDefault();
+            }
         });
         
         document.addEventListener('gesturechange', (e) => {
-            e.preventDefault();
+            const target = e.target;
+            if (target.id === 'rotatingImage' || target.id === 'fallbackStar' || 
+                target.closest('.star-container')) {
+                e.preventDefault();
+            }
         });
     </script>
 </body>
