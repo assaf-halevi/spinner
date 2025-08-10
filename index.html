@@ -348,19 +348,18 @@
                     this.star = this.fallbackStar;
                 });
                 
-                // Touch events for mobile - only on the star itself
-                this.star.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
-                this.star.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
-                this.star.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
+                // Touch events for mobile - on entire document for easy interaction
+                document.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
+                document.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
+                document.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
                 
-                // Mouse events for desktop testing - only on the star itself
-                this.star.addEventListener('mousedown', this.handleStart.bind(this));
-                this.star.addEventListener('mousemove', this.handleMove.bind(this));
-                this.star.addEventListener('mouseup', this.handleEnd.bind(this));
-                this.star.addEventListener('mouseleave', this.handleEnd.bind(this));
+                // Mouse events for desktop testing - on entire document
+                document.addEventListener('mousedown', this.handleStart.bind(this));
+                document.addEventListener('mousemove', this.handleMove.bind(this));
+                document.addEventListener('mouseup', this.handleEnd.bind(this));
                 
-                // Prevent context menu on long press - only on the star
-                this.star.addEventListener('contextmenu', (e) => e.preventDefault());
+                // Prevent context menu on long press - on entire document
+                document.addEventListener('contextmenu', (e) => e.preventDefault());
                 
                 // Start animation loop
                 this.animate();
@@ -368,6 +367,16 @@
             
             handleStart(e) {
                 e.preventDefault();
+                
+                // Allow system swipe-up from bottom edge (for closing app)
+                const touch = e.touches ? e.touches[0] : e;
+                const screenHeight = window.innerHeight;
+                const bottomEdgeThreshold = 50;
+                
+                // If touch starts near bottom edge, don't handle spinning
+                if (touch.clientY > screenHeight - bottomEdgeThreshold) {
+                    return; // Let system handle it
+                }
                 
                 // Initialize audio context on first user interaction
                 if (!this.audioEngine.isInitialized) {
@@ -380,17 +389,18 @@
                 this.isInteracting = true;
                 this.velocityHistory = [];
                 
+                // Always use the star's center, regardless of where touch starts
                 const rect = this.star.getBoundingClientRect();
                 this.centerX = rect.left + rect.width / 2;
                 this.centerY = rect.top + rect.height / 2;
                 
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const clientX = touch.clientX;
+                const clientY = touch.clientY;
                 
                 this.startX = clientX;
                 this.startY = clientY;
                 
-                // Calculate initial angle
+                // Calculate initial angle from star center
                 const deltaX = clientX - this.centerX;
                 const deltaY = clientY - this.centerY;
                 this.lastAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
@@ -403,10 +413,19 @@
                 if (!this.isInteracting) return;
                 e.preventDefault();
                 
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                // Allow system swipe-up from bottom edge
+                const touch = e.touches ? e.touches[0] : e;
+                const screenHeight = window.innerHeight;
+                const bottomEdgeThreshold = 50;
                 
-                // Calculate the angle from center to current position
+                if (touch.clientY > screenHeight - bottomEdgeThreshold) {
+                    return; // Let system handle it
+                }
+                
+                const clientX = touch.clientX;
+                const clientY = touch.clientY;
+                
+                // Calculate the angle from star center to current touch position
                 const deltaX = clientX - this.centerX;
                 const deltaY = clientY - this.centerY;
                 const currentAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
