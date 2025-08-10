@@ -348,17 +348,17 @@
                     this.star = this.fallbackStar;
                 });
                 
-                // Touch events for mobile - on entire document for easy interaction
+                // Touch events for mobile - respond to touches ANYWHERE on screen
                 document.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
                 document.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
                 document.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
                 
-                // Mouse events for desktop testing - on entire document
+                // Mouse events for desktop testing - respond to touches ANYWHERE on screen
                 document.addEventListener('mousedown', this.handleStart.bind(this));
                 document.addEventListener('mousemove', this.handleMove.bind(this));
                 document.addEventListener('mouseup', this.handleEnd.bind(this));
                 
-                // Prevent context menu on long press - on entire document
+                // Prevent context menu on long press - anywhere on screen
                 document.addEventListener('contextmenu', (e) => e.preventDefault());
                 
                 // Start animation loop
@@ -373,9 +373,9 @@
                 const screenHeight = window.innerHeight;
                 const bottomEdgeThreshold = 50;
                 
-                // If touch starts near bottom edge, don't handle spinning
+                // If touch starts near bottom edge, don't handle (allow system gesture)
                 if (touch.clientY > screenHeight - bottomEdgeThreshold) {
-                    return; // Let system handle it
+                    return;
                 }
                 
                 // Initialize audio context on first user interaction
@@ -389,7 +389,7 @@
                 this.isInteracting = true;
                 this.velocityHistory = [];
                 
-                // Always use the star's center, regardless of where touch starts
+                // Always use the star's center as rotation center, regardless of where touch starts
                 const rect = this.star.getBoundingClientRect();
                 this.centerX = rect.left + rect.width / 2;
                 this.centerY = rect.top + rect.height / 2;
@@ -400,7 +400,7 @@
                 this.startX = clientX;
                 this.startY = clientY;
                 
-                // Calculate initial angle from star center
+                // Calculate initial angle from star center to touch point
                 const deltaX = clientX - this.centerX;
                 const deltaY = clientY - this.centerY;
                 this.lastAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
@@ -413,13 +413,13 @@
                 if (!this.isInteracting) return;
                 e.preventDefault();
                 
-                // Allow system swipe-up from bottom edge
                 const touch = e.touches ? e.touches[0] : e;
                 const screenHeight = window.innerHeight;
                 const bottomEdgeThreshold = 50;
                 
+                // If touch moves near bottom edge, don't handle (allow system gesture)
                 if (touch.clientY > screenHeight - bottomEdgeThreshold) {
-                    return; // Let system handle it
+                    return;
                 }
                 
                 const clientX = touch.clientX;
