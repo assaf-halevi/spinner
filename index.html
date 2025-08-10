@@ -1,69 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Momentum Spinner</title>
-    <meta name="theme-color" content="#ff69b4">
-    <style>
-        * {margin: 0; padding: 0; box-sizing: border-box;}
-        body {
-            background: #000000;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            touch-action: none;
-        }
-        .star-container {
-            width: 100vmin;
-            height: 100vmin;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .star {
-            width: 100vmin;
-            height: 100vmin;
-            cursor: grab;
-        }
-        .star:active {cursor: grabbing;}
-        .star.spinning {cursor: default;}
-    </style>
+<meta charset="UTF-8">
+<title>Momentum Spinner</title>
+<style>
+    body {
+        background: #222;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+    }
+    canvas {
+        background: #fff;
+        border-radius: 50%;
+    }
+</style>
 </head>
 <body>
-    <div class="star-container">
-        <img class="star" src="star.png" alt="Spinner" id="rotatingImage">
-    </div>
+<canvas id="spinnerCanvas" width="400" height="400"></canvas>
 
 <script>
 class AudioEngine {
     constructor() {
-        this.audioContext = null;
-        this.masterGain = null;
         this.isEnabled = true;
         this.isInitialized = false;
+        this.audioContext = null;
+        this.masterGain = null;
     }
-    async init() {
+
+    init() {
         if (this.isInitialized) return;
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            this.masterGain = this.audioContext.createGain();
-            this.masterGain.connect(this.audioContext.destination);
-            this.masterGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-            this.isInitialized = true;
-        } catch (error) {
-            console.warn('Audio not supported:', error);
-            this.isEnabled = false;
-        }
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.masterGain = this.audioContext.createGain();
+        this.masterGain.gain.value = 0.5;
+        this.masterGain.connect(this.audioContext.destination);
+        this.isInitialized = true;
     }
+
     createBubblingSound(velocity) {
         if (!this.isEnabled || !this.isInitialized) return null;
         if (this.audioContext.state === 'suspended') this.audioContext.resume();
 
         const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
+
         const mainOsc = this.audioContext.createOscillator();
         const mainGain = this.audioContext.createGain();
         mainOsc.type = 'sine';
@@ -72,32 +53,31 @@ class AudioEngine {
         const volumeLfo = this.audioContext.createOscillator();
         const volumeLfoGain = this.audioContext.createGain();
         volumeLfo.type = 'sine';
-        const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8;
-        volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
-        volumeLfoGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+        volumeLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.02 + 0.5, this.audioContext.currentTime);
+        volumeLfoGain.gain.setValueAtTime(0.5, this.audioContext.currentTime);
         volumeLfo.connect(volumeLfoGain);
         volumeLfoGain.connect(mainGain.gain);
 
         const freqLfo = this.audioContext.createOscillator();
         const freqLfoGain = this.audioContext.createGain();
         freqLfo.type = 'sine';
-        freqLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.1 + 5, this.audioContext.currentTime);
+        freqLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.05 + 2, this.audioContext.currentTime);
         freqLfoGain.gain.setValueAtTime(baseFreq * 0.2, this.audioContext.currentTime);
         freqLfo.connect(freqLfoGain);
         freqLfoGain.connect(mainOsc.frequency);
 
         const harmonic = this.audioContext.createOscillator();
         const harmonicGain = this.audioContext.createGain();
-        harmonic.type = 'triangle';
-        harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
-        harmonicGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+        harmonic.type = 'sine';
+        harmonic.frequency.setValueAtTime(baseFreq * 2, this.audioContext.currentTime);
+        harmonicGain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
 
         mainOsc.connect(mainGain);
         harmonic.connect(harmonicGain);
         mainGain.connect(this.masterGain);
         harmonicGain.connect(this.masterGain);
 
-        const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
+        const baseVolume = Math.min(0.3, Math.abs(velocity) / 800);
         mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
 
         const now = this.audioContext.currentTime;
@@ -113,206 +93,174 @@ class AudioEngine {
         if (!this.isEnabled || !this.isInitialized) return null;
         if (this.audioContext.state === 'suspended') this.audioContext.resume();
 
-        const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
+        const baseFreq = Math.max(80, 800 - Math.abs(velocity) * 3);
+
         const mainOsc = this.audioContext.createOscillator();
         const mainGain = this.audioContext.createGain();
-        mainOsc.type = 'square'; // harsher
+        mainOsc.type = 'sawtooth';
         mainOsc.frequency.setValueAtTime(baseFreq, this.audioContext.currentTime);
 
         const volumeLfo = this.audioContext.createOscillator();
         const volumeLfoGain = this.audioContext.createGain();
-        volumeLfo.type = 'triangle';
-        const volumeOscFreq = Math.abs(velocity) * 0.015 + 0.4;
-        volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
-        volumeLfoGain.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+        volumeLfo.type = 'square';
+        volumeLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.03 + 0.5, this.audioContext.currentTime);
+        volumeLfoGain.gain.setValueAtTime(0.5, this.audioContext.currentTime);
         volumeLfo.connect(volumeLfoGain);
         volumeLfoGain.connect(mainGain.gain);
 
         const freqLfo = this.audioContext.createOscillator();
         const freqLfoGain = this.audioContext.createGain();
-        freqLfo.type = 'sawtooth';
-        freqLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.08 + 3, this.audioContext.currentTime);
-        freqLfoGain.gain.setValueAtTime(-baseFreq * 0.15, this.audioContext.currentTime); // negative for opposite
+        freqLfo.type = 'triangle';
+        freqLfo.frequency.setValueAtTime(Math.abs(velocity) * 0.08 + 2, this.audioContext.currentTime);
+        freqLfoGain.gain.setValueAtTime(-baseFreq * 0.3, this.audioContext.currentTime);
         freqLfo.connect(freqLfoGain);
         freqLfoGain.connect(mainOsc.frequency);
 
-        const harmonic = this.audioContext.createOscillator();
-        const harmonicGain = this.audioContext.createGain();
-        harmonic.type = 'sine';
-        harmonic.frequency.setValueAtTime(baseFreq * 0.5, this.audioContext.currentTime);
-        harmonicGain.gain.setValueAtTime(0.25, this.audioContext.currentTime);
+        const subOsc = this.audioContext.createOscillator();
+        const subGain = this.audioContext.createGain();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(baseFreq / 4, this.audioContext.currentTime);
+        subGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
 
         mainOsc.connect(mainGain);
-        harmonic.connect(harmonicGain);
+        subOsc.connect(subGain);
         mainGain.connect(this.masterGain);
-        harmonicGain.connect(this.masterGain);
+        subGain.connect(this.masterGain);
 
         const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
         mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
 
         const now = this.audioContext.currentTime;
         mainOsc.start(now);
-        harmonic.start(now);
+        subOsc.start(now);
         freqLfo.start(now);
         volumeLfo.start(now);
 
-        return { main: mainOsc, harmonic, freqLfo, volumeLfo, mainGain, harmonicGain, freqLfoGain, volumeLfoGain };
+        return { main: mainOsc, harmonic: subOsc, freqLfo, volumeLfo, mainGain, harmonicGain: subGain, freqLfoGain, volumeLfoGain };
     }
 
-    updateSound(soundGroup, velocity) {
-        if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
-        const baseFreq = Math.max(100, Math.abs(velocity) * 2 + 200);
-        const baseVolume = Math.min(0.4, Math.abs(velocity) / 800);
-        const volumeOscFreq = Math.abs(velocity) * 0.02 + 0.8;
+    stopSound(oscillatorGroup) {
+        if (!oscillatorGroup) return;
         const now = this.audioContext.currentTime;
-        soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
-        soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
-        soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(Math.abs(velocity) * 0.1 + 5, now + 0.1);
-        soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
-        soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
-        soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.2, now + 0.1);
-    }
-
-    stopSound(soundGroup) {
-        if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
-        const now = this.audioContext.currentTime;
-        const fadeTime = 0.1;
-        soundGroup.mainGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-        soundGroup.harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-        setTimeout(() => {
-            try {
-                soundGroup.main.stop();
-                soundGroup.harmonic.stop();
-                soundGroup.freqLfo.stop();
-                soundGroup.volumeLfo.stop();
-            } catch {}
-        }, fadeTime * 1000 + 50);
+        for (let key in oscillatorGroup) {
+            if (oscillatorGroup[key] && typeof oscillatorGroup[key].stop === "function") {
+                oscillatorGroup[key].stop(now);
+            }
+        }
     }
 }
 
 class MomentumSpinner {
-    constructor() {
-        this.star = document.getElementById('rotatingImage');
-        this.rotation = 0;
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.center = { x: canvas.width / 2, y: canvas.height / 2 };
+        this.radius = Math.min(canvas.width, canvas.height) / 2 - 20;
+
+        this.angle = 0;
         this.velocity = 0;
-        this.isInteracting = false;
-        this.isSpinning = false;
-        this.startX = 0;
-        this.startY = 0;
-        this.centerX = 0;
-        this.centerY = 0;
-        this.lastAngle = 0;
-        this.lastTime = 0;
-        this.velocityHistory = [];
-        this.friction = 0.99;
-        this.minVelocity = 5;
-        this.velocityMultiplier = 2;
+        this.isDragging = false;
+        this.lastMouseAngle = 0;
+
         this.audioEngine = new AudioEngine();
+        this.audioEngine.init();
         this.currentSound = null;
-        this.init();
+
+        this.draw();
+        this.bindEvents();
     }
-    async init() {
-        await this.audioEngine.init();
-        this.star.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
-        this.star.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
-        this.star.addEventListener('touchend', this.handleEnd.bind(this), { passive: false });
-        this.star.addEventListener('mousedown', this.handleStart.bind(this));
-        this.star.addEventListener('mousemove', this.handleMove.bind(this));
-        this.star.addEventListener('mouseup', this.handleEnd.bind(this));
-        this.star.addEventListener('mouseleave', this.handleEnd.bind(this));
-        this.animate();
+
+    bindEvents() {
+        this.canvas.addEventListener('mousedown', e => this.onMouseDown(e));
+        this.canvas.addEventListener('mousemove', e => this.onMouseMove(e));
+        this.canvas.addEventListener('mouseup', e => this.onMouseUp(e));
+        this.canvas.addEventListener('mouseleave', e => this.onMouseUp(e));
     }
-    handleStart(e) {
-        e.preventDefault();
-        if (!this.audioEngine.isInitialized) this.audioEngine.init();
-        this.stopSpinning();
-        this.isInteracting = true;
-        this.velocityHistory = [];
-        const rect = this.star.getBoundingClientRect();
-        this.centerX = rect.left + rect.width / 2;
-        this.centerY = rect.top + rect.height / 2;
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const deltaX = clientX - this.centerX;
-        const deltaY = clientY - this.centerY;
-        this.lastAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-        this.lastTime = Date.now();
+
+    getMouseAngle(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - this.center.x;
+        const y = e.clientY - rect.top - this.center.y;
+        return Math.atan2(y, x);
     }
-    handleMove(e) {
-        if (!this.isInteracting) return;
-        e.preventDefault();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const deltaX = clientX - this.centerX;
-        const deltaY = clientY - this.centerY;
-        const currentAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-        let angleDiff = currentAngle - this.lastAngle;
-        if (angleDiff > 180) angleDiff -= 360;
-        if (angleDiff < -180) angleDiff += 360;
-        this.rotation += angleDiff;
-        const currentTime = Date.now();
-        const timeDiff = currentTime - this.lastTime;
-        if (timeDiff > 0) {
-            const instantVelocity = (angleDiff / timeDiff) * 1000;
-            this.velocityHistory.push(instantVelocity);
-            if (this.velocityHistory.length > 5) this.velocityHistory.shift();
-        }
-        this.lastAngle = currentAngle;
-        this.lastTime = currentTime;
-        this.updateRotation();
-    }
-    handleEnd() {
-        if (!this.isInteracting) return;
-        this.isInteracting = false;
-        if (this.velocityHistory.length > 0) {
-            const avgVelocity = this.velocityHistory.reduce((a, b) => a + b, 0) / this.velocityHistory.length;
-            this.velocity = avgVelocity * this.velocityMultiplier;
-            if (Math.abs(this.velocity) > this.minVelocity) this.startSpinning();
-        }
-        this.velocityHistory = [];
-    }
-    startSpinning() {
-        this.isSpinning = true;
-        if (this.audioEngine.isEnabled) {
-            if (this.velocity >= 0) {
-                this.currentSound = this.audioEngine.createBubblingSound(this.velocity);
-            } else {
-                this.currentSound = this.audioEngine.createReverseSound(this.velocity);
-            }
-        }
-    }
-    stopSpinning() {
-        this.isSpinning = false;
+
+    onMouseDown(e) {
+        this.isDragging = true;
+        this.lastMouseAngle = this.getMouseAngle(e);
         this.velocity = 0;
-        if (this.currentSound) {
+        this.audioEngine.stopSound(this.currentSound);
+        this.currentSound = null;
+    }
+
+    onMouseMove(e) {
+        if (!this.isDragging) return;
+        const angle = this.getMouseAngle(e);
+        let delta = angle - this.lastMouseAngle;
+        if (delta > Math.PI) delta -= Math.PI * 2;
+        if (delta < -Math.PI) delta += Math.PI * 2;
+
+        this.angle += delta;
+        this.velocity = delta * 1000; 
+        this.lastMouseAngle = angle;
+        this.draw();
+    }
+
+    onMouseUp(e) {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+        this.startSpinning();
+    }
+
+    startSpinning() {
+        this.audioEngine.stopSound(this.currentSound);
+        if (this.velocity >= 0) {
+            this.currentSound = this.audioEngine.createBubblingSound(this.velocity);
+        } else {
+            this.currentSound = this.audioEngine.createReverseSound(this.velocity);
+        }
+        requestAnimationFrame(() => this.spinLoop());
+    }
+
+    spinLoop() {
+        this.angle += this.velocity / 1000;
+        this.velocity *= 0.98; 
+
+        if (Math.abs(this.velocity) < 0.01) {
+            this.velocity = 0;
             this.audioEngine.stopSound(this.currentSound);
             this.currentSound = null;
+            return;
         }
+        this.draw();
+        requestAnimationFrame(() => this.spinLoop());
     }
-    animate() {
-        if (this.isSpinning && !this.isInteracting) {
-            this.velocity *= this.friction;
-            if (this.currentSound && this.audioEngine.isEnabled) {
-                this.audioEngine.updateSound(this.currentSound, this.velocity);
-            }
-            if (Math.abs(this.velocity) < this.minVelocity) {
-                this.stopSpinning();
-            } else {
-                this.rotation += this.velocity / 60;
-                this.updateRotation();
-            }
-        }
-        requestAnimationFrame(() => this.animate());
-    }
-    updateRotation() {
-        this.star.style.transform = `rotate(${this.rotation}deg)`;
+
+    draw() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.save();
+        ctx.translate(this.center.x, this.center.y);
+        ctx.rotate(this.angle);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#66c2ff';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(this.radius, 0);
+        ctx.strokeStyle = '#003366';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+
+        ctx.restore();
     }
 }
 
-window.addEventListener('load', () => { new MomentumSpinner(); });
-document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-document.addEventListener('gesturestart', (e) => e.preventDefault());
-document.addEventListener('gesturechange', (e) => e.preventDefault());
+const canvas = document.getElementById('spinnerCanvas');
+new MomentumSpinner(canvas);
 </script>
 </body>
 </html>
