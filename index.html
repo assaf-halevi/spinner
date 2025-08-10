@@ -59,8 +59,6 @@
             cursor: default;
         }
 
-
-
         /* Fallback star using CSS if image doesn't load */
         .css-star {
             width: 100vmin;
@@ -128,54 +126,68 @@
                 const isClockwise = velocity > 0;
                 const absVelocity = Math.abs(velocity);
                 
-                if (isClockwise) {
-                    return this.createClockwiseSound(absVelocity);
-                } else {
-                    return this.createCounterClockwiseSound(absVelocity);
-                }
-            }
-            
-            createClockwiseSound(velocity) {
-                // Clockwise: Bright, bubbling, ascending sound
-                const oscillatorGroup = [];
-                const baseFreq = Math.max(200, velocity * 3 + 300); // Higher base frequency
+                // Same instrument type (sine wave bubbling), different pitch directions
+                const baseFreq = Math.max(150, absVelocity * 2 + 250);
                 
-                // Main bright oscillator
+                // Main oscillator - always sine wave
                 const mainOsc = this.audioContext.createOscillator();
                 const mainGain = this.audioContext.createGain();
                 
-                mainOsc.type = 'sine'; // Pure, clean tone
+                mainOsc.type = 'sine'; // Same instrument type
                 mainOsc.frequency.setValueAtTime(baseFreq, this.audioContext.currentTime);
                 
-                // Fast, bright volume modulation (short, quick bubbles)
+                // Volume modulation - same pattern
                 const volumeLfo = this.audioContext.createOscillator();
                 const volumeLfoGain = this.audioContext.createGain();
                 volumeLfo.type = 'sine';
                 
-                const volumeOscFreq = velocity * 0.05 + 2; // Fast oscillation
+                const volumeOscFreq = absVelocity * 0.03 + 1.2;
                 volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
-                volumeLfoGain.gain.setValueAtTime(0.4, this.audioContext.currentTime); // Deep modulation
+                volumeLfoGain.gain.setValueAtTime(0.35, this.audioContext.currentTime);
                 
                 volumeLfo.connect(volumeLfoGain);
                 volumeLfoGain.connect(mainGain.gain);
                 
-                // Ascending frequency modulation
+                // Frequency modulation - DIRECTION DETERMINES PITCH SWEEP
                 const freqLfo = this.audioContext.createOscillator();
                 const freqLfoGain = this.audioContext.createGain();
-                freqLfo.type = 'triangle';
-                freqLfo.frequency.setValueAtTime(velocity * 0.08 + 3, this.audioContext.currentTime);
-                freqLfoGain.gain.setValueAtTime(baseFreq * 0.3, this.audioContext.currentTime); // Strong modulation
+                freqLfo.type = 'triangle'; // Same modulation type
+                freqLfo.frequency.setValueAtTime(absVelocity * 0.06 + 4, this.audioContext.currentTime);
+                
+                // KEY DIFFERENCE: Direction determines if pitch sweeps up or down
+                if (isClockwise) {
+                    // Clockwise: Positive pitch modulation (sweeps upward)
+                    freqLfoGain.gain.setValueAtTime(baseFreq * 0.25, this.audioContext.currentTime);
+                } else {
+                    // Counter-clockwise: Negative pitch modulation (sweeps downward)  
+                    freqLfoGain.gain.setValueAtTime(-baseFreq * 0.25, this.audioContext.currentTime);
+                }
                 
                 freqLfo.connect(freqLfoGain);
                 freqLfoGain.connect(mainOsc.frequency);
                 
-                // Bright harmonic
+                // Same harmonic structure for both directions
                 const harmonic = this.audioContext.createOscillator();
                 const harmonicGain = this.audioContext.createGain();
                 
-                harmonic.type = 'triangle'; // Brighter tone
-                harmonic.frequency.setValueAtTime(baseFreq * 2, this.audioContext.currentTime); // Higher harmonic
-                harmonicGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                harmonic.type = 'sine'; // Same instrument
+                harmonic.frequency.setValueAtTime(baseFreq * 1.5, this.audioContext.currentTime);
+                harmonicGain.gain.setValueAtTime(0.25, this.audioContext.currentTime);
+                
+                // Apply same directional modulation to harmonic
+                const harmonicFreqLfo = this.audioContext.createOscillator();
+                const harmonicFreqLfoGain = this.audioContext.createGain();
+                harmonicFreqLfo.type = 'triangle';
+                harmonicFreqLfo.frequency.setValueAtTime(absVelocity * 0.06 + 4, this.audioContext.currentTime);
+                
+                if (isClockwise) {
+                    harmonicFreqLfoGain.gain.setValueAtTime(baseFreq * 1.5 * 0.25, this.audioContext.currentTime);
+                } else {
+                    harmonicFreqLfoGain.gain.setValueAtTime(-baseFreq * 1.5 * 0.25, this.audioContext.currentTime);
+                }
+                
+                harmonicFreqLfo.connect(harmonicFreqLfoGain);
+                harmonicFreqLfoGain.connect(harmonic.frequency);
                 
                 // Connect everything
                 mainOsc.connect(mainGain);
@@ -185,7 +197,7 @@
                 harmonicGain.connect(this.masterGain);
                 
                 // Set base volume
-                const baseVolume = Math.min(0.5, velocity / 600);
+                const baseVolume = Math.min(0.45, absVelocity / 700);
                 mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
                 
                 // Start oscillators
@@ -194,103 +206,20 @@
                 harmonic.start(now);
                 freqLfo.start(now);
                 volumeLfo.start(now);
+                harmonicFreqLfo.start(now);
                 
                 return {
                     main: mainOsc,
                     harmonic: harmonic,
                     freqLfo: freqLfo,
+                    harmonicFreqLfo: harmonicFreqLfo,
                     volumeLfo: volumeLfo,
                     mainGain: mainGain,
                     harmonicGain: harmonicGain,
                     freqLfoGain: freqLfoGain,
+                    harmonicFreqLfoGain: harmonicFreqLfoGain,
                     volumeLfoGain: volumeLfoGain,
-                    direction: 'clockwise'
-                };
-            }
-            
-            createCounterClockwiseSound(velocity) {
-                // Counter-clockwise: Dark, rumbling, descending sound
-                const oscillatorGroup = [];
-                const baseFreq = Math.max(80, velocity * 1.5 + 120); // Much lower base frequency
-                
-                // Main dark oscillator
-                const mainOsc = this.audioContext.createOscillator();
-                const mainGain = this.audioContext.createGain();
-                
-                mainOsc.type = 'sawtooth'; // Harsh, dark tone
-                mainOsc.frequency.setValueAtTime(baseFreq, this.audioContext.currentTime);
-                
-                // Slow, deep volume modulation (long, rumbling waves)
-                const volumeLfo = this.audioContext.createOscillator();
-                const volumeLfoGain = this.audioContext.createGain();
-                volumeLfo.type = 'triangle';
-                
-                const volumeOscFreq = velocity * 0.01 + 0.3; // Very slow oscillation
-                volumeLfo.frequency.setValueAtTime(volumeOscFreq, this.audioContext.currentTime);
-                volumeLfoGain.gain.setValueAtTime(0.5, this.audioContext.currentTime); // Very deep modulation
-                
-                volumeLfo.connect(volumeLfoGain);
-                volumeLfoGain.connect(mainGain.gain);
-                
-                // Descending frequency modulation
-                const freqLfo = this.audioContext.createOscillator();
-                const freqLfoGain = this.audioContext.createGain();
-                freqLfo.type = 'sawtooth';
-                freqLfo.frequency.setValueAtTime(velocity * 0.03 + 1, this.audioContext.currentTime);
-                freqLfoGain.gain.setValueAtTime(baseFreq * 0.4, this.audioContext.currentTime); // Very strong modulation
-                
-                freqLfo.connect(freqLfoGain);
-                freqLfoGain.connect(mainOsc.frequency);
-                
-                // Dark sub-harmonic
-                const subHarmonic = this.audioContext.createOscillator();
-                const subHarmonicGain = this.audioContext.createGain();
-                
-                subHarmonic.type = 'square'; // Very harsh tone
-                subHarmonic.frequency.setValueAtTime(baseFreq * 0.5, this.audioContext.currentTime); // Lower frequency
-                subHarmonicGain.gain.setValueAtTime(0.4, this.audioContext.currentTime);
-                
-                // Additional rumble oscillator
-                const rumbleOsc = this.audioContext.createOscillator();
-                const rumbleGain = this.audioContext.createGain();
-                
-                rumbleOsc.type = 'sawtooth';
-                rumbleOsc.frequency.setValueAtTime(baseFreq * 0.25, this.audioContext.currentTime); // Very low rumble
-                rumbleGain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                
-                // Connect everything
-                mainOsc.connect(mainGain);
-                subHarmonic.connect(subHarmonicGain);
-                rumbleOsc.connect(rumbleGain);
-                
-                mainGain.connect(this.masterGain);
-                subHarmonicGain.connect(this.masterGain);
-                rumbleGain.connect(this.masterGain);
-                
-                // Set base volume
-                const baseVolume = Math.min(0.4, velocity / 700);
-                mainGain.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
-                
-                // Start oscillators
-                const now = this.audioContext.currentTime;
-                mainOsc.start(now);
-                subHarmonic.start(now);
-                rumbleOsc.start(now);
-                freqLfo.start(now);
-                volumeLfo.start(now);
-                
-                return {
-                    main: mainOsc,
-                    harmonic: subHarmonic,
-                    rumble: rumbleOsc,
-                    freqLfo: freqLfo,
-                    volumeLfo: volumeLfo,
-                    mainGain: mainGain,
-                    harmonicGain: subHarmonicGain,
-                    rumbleGain: rumbleGain,
-                    freqLfoGain: freqLfoGain,
-                    volumeLfoGain: volumeLfoGain,
-                    direction: 'counterclockwise'
+                    direction: isClockwise ? 'clockwise' : 'counterclockwise'
                 };
             }
             
@@ -298,36 +227,29 @@
                 if (!soundGroup || !this.isEnabled || !this.isInitialized) return;
                 
                 const absVelocity = Math.abs(velocity);
+                const isClockwise = velocity > 0;
+                const baseFreq = Math.max(150, absVelocity * 2 + 250);
+                const baseVolume = Math.min(0.45, absVelocity / 700);
+                const volumeOscFreq = absVelocity * 0.03 + 1.2;
                 const now = this.audioContext.currentTime;
                 
-                if (soundGroup.direction === 'clockwise') {
-                    // Update clockwise sound
-                    const baseFreq = Math.max(200, absVelocity * 3 + 300);
-                    const baseVolume = Math.min(0.5, absVelocity / 600);
-                    const volumeOscFreq = absVelocity * 0.05 + 2;
-                    
-                    soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
-                    soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 2, now + 0.1);
-                    soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(absVelocity * 0.08 + 3, now + 0.1);
-                    soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
-                    soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
-                    soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.3, now + 0.1);
-                    
+                // Update frequencies
+                soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
+                soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, now + 0.1);
+                soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(absVelocity * 0.06 + 4, now + 0.1);
+                soundGroup.harmonicFreqLfo.frequency.exponentialRampToValueAtTime(absVelocity * 0.06 + 4, now + 0.1);
+                soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
+                
+                // Update volume
+                soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
+                
+                // Update directional pitch modulation
+                if (isClockwise) {
+                    soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.25, now + 0.1);
+                    soundGroup.harmonicFreqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 1.5 * 0.25, now + 0.1);
                 } else {
-                    // Update counterclockwise sound
-                    const baseFreq = Math.max(80, absVelocity * 1.5 + 120);
-                    const baseVolume = Math.min(0.4, absVelocity / 700);
-                    const volumeOscFreq = absVelocity * 0.01 + 0.3;
-                    
-                    soundGroup.main.frequency.exponentialRampToValueAtTime(baseFreq, now + 0.1);
-                    soundGroup.harmonic.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + 0.1);
-                    if (soundGroup.rumble) {
-                        soundGroup.rumble.frequency.exponentialRampToValueAtTime(baseFreq * 0.25, now + 0.1);
-                    }
-                    soundGroup.freqLfo.frequency.exponentialRampToValueAtTime(absVelocity * 0.03 + 1, now + 0.1);
-                    soundGroup.volumeLfo.frequency.exponentialRampToValueAtTime(volumeOscFreq, now + 0.1);
-                    soundGroup.mainGain.gain.exponentialRampToValueAtTime(Math.max(0.001, baseVolume), now + 0.1);
-                    soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(baseFreq * 0.4, now + 0.1);
+                    soundGroup.freqLfoGain.gain.exponentialRampToValueAtTime(-baseFreq * 0.25, now + 0.1);
+                    soundGroup.harmonicFreqLfoGain.gain.exponentialRampToValueAtTime(-baseFreq * 1.5 * 0.25, now + 0.1);
                 }
             }
             
@@ -340,17 +262,14 @@
                 // Fade out all gains
                 soundGroup.mainGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
                 soundGroup.harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-                if (soundGroup.rumbleGain) {
-                    soundGroup.rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + fadeTime);
-                }
                 
                 // Stop oscillators after fade
                 setTimeout(() => {
                     try {
                         soundGroup.main.stop();
                         soundGroup.harmonic.stop();
-                        if (soundGroup.rumble) soundGroup.rumble.stop();
                         soundGroup.freqLfo.stop();
+                        soundGroup.harmonicFreqLfo.stop();
                         soundGroup.volumeLfo.stop();
                     } catch (e) {
                         // Oscillators might already be stopped
@@ -545,10 +464,6 @@
                     this.audioEngine.stopSound(this.currentSound);
                     this.currentSound = null;
                 }
-            }
-            
-            updateDirectionDisplay() {
-                // Removed - no text display
             }
             
             animate() {
